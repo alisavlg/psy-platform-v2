@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Комната | PsyHelp</title>
+    <link rel="stylesheet" href="../assets/css/theme.css">
+    <link rel="stylesheet" href="../assets/css/room.css">
+</head>
+<body>
+    <div class="room-layout">
+
+        <header class="room-topbar">
+            <div class="room-topbar-left">
+                <span class="room-status-dot" id="roomStatusDot"></span>
+                <span class="room-status-text" id="roomStatus">Загрузка комнаты...</span>
+            </div>
+            <div class="room-topbar-center">
+                <div class="room-peer-name" id="roomPeerName">—</div>
+                <div class="room-peer-role" id="roomPeerRole">—</div>
+            </div>
+            <div class="room-topbar-right">
+                <span class="room-my-name" id="roomMyName"></span>
+                <a class="room-leave-btn" id="leaveBtn" href="#">Завершить</a>
+            </div>
+        </header>
+
+        <main class="room-main" id="roomMain">
+            <div id="jitsiContainer" class="jitsi-container"></div>
+            <div class="room-loading" id="roomLoading">
+                <div class="room-loading-spinner"></div>
+                <p>Подключаемся к комнате...</p>
+            </div>
+        </main>
+
+    </div>
+
+    <script src="https://meet.jit.si/external_api.js"></script>
+
+    <!-- Supabase -->
+    <script type="module">
+        import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
+
+        window.supa = createClient(
+            'https://ubbzkxxmgfvvyvfjfcmo.supabase.co',
+            'sb_publishable_miE5iopycXLfLa_XPektzQ_c-GanKnt'
+        );
+
+        console.log('[supabase] клиент создан (room.html)');
+    </script>
+
+    <script src="../assets/js/room.js"></script>
+</body>
+</html>
