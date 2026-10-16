@@ -99,13 +99,7 @@ document.addEventListener('DOMContentLoaded', function () {
             : 'client.html?section=catalog';
     }
 
-    async function waitForSupa() {
-        for (var i = 0; i < 50; i++) {
-            if (window.supa) return true;
-            await new Promise(function (r) { setTimeout(r, 100); });
-        }
-        return false;
-    }
+    
 
     form.addEventListener('submit', async function (e) {
         e.preventDefault();
@@ -119,21 +113,14 @@ document.addEventListener('DOMContentLoaded', function () {
         messageEl.className = 'form-message';
         messageEl.textContent = '';
 
-        var ready = await waitForSupa();
-        if (!ready) {
-            messageEl.className = 'form-message error';
-            messageEl.textContent = 'Не удалось подключиться к серверу. Обновите страницу.';
-            submitBtn.disabled = false;
-            submitBtn.textContent = 'Войти';
-            return;
-        }
+        
 
         var email = document.getElementById('email').value.trim();
         var password = document.getElementById('password').value;
 
         try {
             console.log('[login] signIn...');
-            var signInResult = await window.supa.auth.signInWithPassword({
+            var signInResult = await supa.auth.signInWithPassword({
                 email: email,
                 password: password
             });
@@ -155,7 +142,7 @@ document.addEventListener('DOMContentLoaded', function () {
             console.log('[login] авторизован:', authUser.id);
 
             // Загружаем профиль
-            var profileResult = await window.supa
+            var profileResult = await supa
                 .from('profiles')
                 .select('*')
                 .eq('id', authUser.id)
