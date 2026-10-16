@@ -22,12 +22,14 @@ import { renderTopbar } from '@/components/Topbar.js';
 import { renderUserMenu } from '@/components/UserMenu.js';
 import { initNotifications } from '@/components/Notifications.js';
 
-// Старая логика разделов — пока работает как есть, переведём по одному
+// Разделы (v2)
+import { initClientProfile } from '@/pages/client-profile.js';
+
+// Разделы (v1 — ещё не переведены)
 import '../../assets/js/client.js';
 import '../../assets/js/calendar.js';
 import '../../assets/js/messenger.js';
 import '../../assets/js/sessions.js';
-import '../../assets/js/client-profile.js';
 import '../../assets/js/become-block.js';
 
 console.log('[client.js] loaded');
@@ -59,11 +61,16 @@ document.addEventListener('DOMContentLoaded', async function () {
     var section = getSectionFromURL();
     var title = SECTION_TITLES[section] || 'Кабинет';
 
-    // 1. Каркас: боковое меню и шапка
+    // Каркас
     renderSidebar('client', section);
     renderTopbar(title);
 
-    // 2. Меню пользователя и уведомления — после Topbar (он создаёт .topbar-actions)
+    // Меню пользователя и уведомления — после Topbar
     await renderUserMenu();
     await initNotifications();
+
+    // Профиль — наш v2-модуль
+    if (section === 'profile') {
+        await initClientProfile();
+    }
 });

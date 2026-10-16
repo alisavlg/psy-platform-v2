@@ -1,8 +1,11 @@
 // ============================================
-// ПРОФИЛЬ КЛИЕНТА — данные из Supabase
+// ПРОФИЛЬ КЛИЕНТА — модуль v2
 // ============================================
 
-console.log('[client-profile.js] loaded');
+import { supa } from '@/lib/supabase.js';
+import { renderUserMenu } from '@/components/UserMenu.js';
+
+console.log('[client-profile] loaded');
 
 var CLIENT_USER_KEY = 'psyhelp_user';
 var PASSWORD_MAX_AGE_DAYS = 60;
@@ -14,29 +17,11 @@ var PASSWORD_MAX_AGE_DAYS = 60;
 function getClientUser() {
     var data = localStorage.getItem(CLIENT_USER_KEY);
     if (!data) return {};
-    try {
-        var u = JSON.parse(data);
-        return u || {};
-    } catch (e) { return {}; }
+    try { return JSON.parse(data) || {}; } catch (e) { return {}; }
 }
 
 function saveClientUser(user) {
     localStorage.setItem(CLIENT_USER_KEY, JSON.stringify(user));
-}
-
-// ============================================
-// Supabase helper
-// ============================================
-
-function waitForSupa(maxAttempts) {
-    return new Promise(function (resolve) {
-        var attempts = 0;
-        var timer = setInterval(function () {
-            attempts++;
-            if (window.supa) { clearInterval(timer); resolve(true); }
-            else if (attempts >= maxAttempts) { clearInterval(timer); resolve(false); }
-        }, 100);
-    });
 }
 
 // ============================================
@@ -45,7 +30,7 @@ function waitForSupa(maxAttempts) {
 
 async function loadProfileFromSupabase() {
     try {
-        var sessionResult = await window.supa.auth.getSession();
+        var sessionResult = await supa.auth.getSession();
         if (sessionResult.error || !sessionResult.data.session) {
             console.warn('[client-profile] нет сессии');
             return null;
@@ -54,7 +39,7 @@ async function loadProfileFromSupabase() {
         var userId = sessionResult.data.session.user.id;
         var authEmail = sessionResult.data.session.user.email;
 
-        var result = await window.supa
+        var result = await supa
             .from('profiles')
             .select('*')
             .eq('id', userId)
@@ -67,10 +52,9 @@ async function loadProfileFromSupabase() {
 
         var p = result.data;
 
-        // Проверяем активную заявку на психолога
         var appStatus = null;
         try {
-            var appResult = await window.supa
+            var appResult = await supa
                 .from('applications')
                 .select('status')
                 .eq('user_id', userId)
@@ -117,14 +101,14 @@ async function loadProfileFromSupabase() {
 
 async function saveProfileToSupabase(data) {
     try {
-        var sessionResult = await window.supa.auth.getSession();
+        var sessionResult = await supa.auth.getSession();
         if (sessionResult.error || !sessionResult.data.session) {
             return { success: false, error: 'Нет активной сессии' };
         }
 
         var userId = sessionResult.data.session.user.id;
 
-        var result = await window.supa
+        var result = await supa
             .from('profiles')
             .update({
                 display_first_name: data.displayFirstName || '',
@@ -167,7 +151,7 @@ function getDisplayName(user) {
 // Отрисовка
 // ============================================
 
-function renderClientProfile() {
+export function renderClientProfile() {
     var user = getClientUser();
 
     var realF = document.getElementById('clientRealFirstName');
@@ -222,8 +206,6 @@ function renderClientProfile() {
 
     var tzEl = document.getElementById('clientTimezone');
     if (tzEl) tzEl.value = user.timezone || 'Europe/Moscow';
-
-    // Блок «Стать психологом» ведёт become-block.js — не трогаем отсюда
 
     renderClientPasswordStatus(user);
 }
@@ -350,11 +332,9 @@ async function handleClientProfileSave(e) {
         }, 3000);
     }
 
-    if (typeof renderUserMenu === 'function') {
-        var oldMenu = document.getElementById('userMenu');
-        if (oldMenu) oldMenu.remove();
-        renderUserMenu();
-    }
+    var oldMenu = document.getElementById('userMenu');
+    if (oldMenu) oldMenu.remove();
+    await renderUserMenu();
 }
 
 // ============================================
@@ -410,7 +390,7 @@ async function handleAvatarUpload(e) {
     if (avatarEl) avatarEl.style.opacity = '0.5';
 
     try {
-        var upRes = await window.supa.storage
+        var upRes = await supa.storage
             .from('avatars')
             .upload(path, file, { upsert: true, contentType: file.type });
 
@@ -421,10 +401,10 @@ async function handleAvatarUpload(e) {
             return;
         }
 
-        var urlRes = window.supa.storage.from('avatars').getPublicUrl(path);
+        var urlRes = supa.storage.from('avatars').getPublicUrl(path);
         var publicUrl = urlRes.data.publicUrl;
 
-        var updRes = await window.supa
+        var updRes = await supa
             .from('profiles')
             .update({ avatar_url: publicUrl })
             .eq('id', user.id);
@@ -447,11 +427,9 @@ async function handleAvatarUpload(e) {
             avatarEl.style.opacity = '';
         }
 
-        if (typeof renderUserMenu === 'function') {
-            var oldMenu = document.getElementById('userMenu');
-            if (oldMenu) oldMenu.remove();
-            renderUserMenu();
-        }
+        var oldMenu = document.getElementById('userMenu');
+        if (oldMenu) oldMenu.remove();
+        await renderUserMenu();
 
     } catch (err) {
         console.error('[client-profile] exception:', err);
@@ -463,7 +441,7 @@ async function handleAvatarUpload(e) {
 }
 
 // ============================================
-// Смена пароля через Supabase
+// Смена пароля
 // ============================================
 
 function toggleClientPasswordForm() {
@@ -532,7 +510,7 @@ async function handleClientPasswordChange() {
     if (!isValid) return;
 
     try {
-        var sessionResult = await window.supa.auth.getSession();
+        var sessionResult = await supa.auth.getSession();
         if (!sessionResult.data.session) {
             if (msg) {
                 msg.className = 'change-password-message error';
@@ -543,7 +521,7 @@ async function handleClientPasswordChange() {
 
         var email = sessionResult.data.session.user.email;
 
-        var checkResult = await window.supa.auth.signInWithPassword({
+        var checkResult = await supa.auth.signInWithPassword({
             email: email,
             password: current
         });
@@ -553,9 +531,7 @@ async function handleClientPasswordChange() {
             return;
         }
 
-        var updateResult = await window.supa.auth.updateUser({
-            password: newPwd
-        });
+        var updateResult = await supa.auth.updateUser({ password: newPwd });
 
         if (updateResult.error) {
             if (msg) {
@@ -590,64 +566,48 @@ async function handleClientPasswordChange() {
 }
 
 // ============================================
-// Инициализация
+// Привязка обработчиков
 // ============================================
 
+var handlersBound = false;
+
 function bindClientProfileHandlers() {
+    if (handlersBound) return;
+    handlersBound = true;
     console.log('[client-profile] bind handlers');
 
     var form = document.getElementById('clientProfileForm');
-    if (form && !form.__bound) {
-        form.addEventListener('submit', handleClientProfileSave);
-        form.__bound = true;
-    }
+    if (form) form.addEventListener('submit', handleClientProfileSave);
 
     var copyBtn = document.getElementById('copyCodeBtn');
-    if (copyBtn && !copyBtn.__bound) {
-        copyBtn.addEventListener('click', copyClientCode);
-        copyBtn.__bound = true;
-    }
+    if (copyBtn) copyBtn.addEventListener('click', copyClientCode);
 
     var avatarInput = document.getElementById('clientAvatarInput');
     var avatarBtn = document.getElementById('clientAvatarBtn');
-
-    if (avatarBtn && avatarInput && !avatarBtn.__bound) {
+    if (avatarBtn && avatarInput) {
         avatarBtn.onclick = function (e) {
             e.preventDefault();
             avatarInput.click();
         };
         avatarInput.onchange = handleAvatarUpload;
-        avatarBtn.__bound = true;
-        console.log('[client-profile] avatar btn bound');
     }
 
     var changeBtn = document.getElementById('clientChangePasswordBtn');
-    if (changeBtn && !changeBtn.__bound) {
-        changeBtn.addEventListener('click', toggleClientPasswordForm);
-        changeBtn.__bound = true;
-    }
+    if (changeBtn) changeBtn.addEventListener('click', toggleClientPasswordForm);
 
     var confirmBtn = document.getElementById('clientConfirmPasswordBtn');
-    if (confirmBtn && !confirmBtn.__bound) {
-        confirmBtn.addEventListener('click', handleClientPasswordChange);
-        confirmBtn.__bound = true;
-    }
+    if (confirmBtn) confirmBtn.addEventListener('click', handleClientPasswordChange);
 
     var cancelBtn = document.getElementById('clientCancelPasswordBtn');
-    if (cancelBtn && !cancelBtn.__bound) {
-        cancelBtn.addEventListener('click', cancelClientPasswordChange);
-        cancelBtn.__bound = true;
-    }
+    if (cancelBtn) cancelBtn.addEventListener('click', cancelClientPasswordChange);
 }
 
-document.addEventListener('DOMContentLoaded', async function () {
-    var ready = await waitForSupa(50);
-    if (ready) {
-        await loadProfileFromSupabase();
-    } else {
-        console.warn('[client-profile] Supabase не загрузился, работаем с кешем');
-    }
+// ============================================
+// Публичная инициализация
+// ============================================
 
+export async function initClientProfile() {
+    await loadProfileFromSupabase();
     renderClientProfile();
     bindClientProfileHandlers();
-});
+}
