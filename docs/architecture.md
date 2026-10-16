@@ -241,3 +241,87 @@ profile.js → profiles.timezone
 - `changelog.md`
 
 **При старте нового чата:** `state.md` + `architecture.md` + `theme-guide.md`.
+
+Начало файла:
+markdown
+
+# Eupsy — Архитектура проекта (v2)
+
+Конец файла (последняя строка):
+markdown
+
+- `start-chat.txt`
+
+Полный текст файла 2 — вот он:
+Eupsy — Архитектура проекта (v2)
+
+Версия: 5.0
+Последнее обновление: 16 октября 2026
+1. Структура v2
+text
+
+psy-platform-v2/
+├── public/                ← HTML
+├── src/                   ← исходники
+│   ├── components/
+│   ├── lib/
+│   ├── pages/
+│   └── styles/
+├── assets/
+├── pages/
+├── docs/
+├── index.html
+├── package.json
+├── vite.config.js
+└── .gitignore
+
+2. Как работает Vite
+
+Dev: npm run dev → localhost:5173.
+Сборка: npm run build → dist/.
+Alias: @ = src/.
+3. Страницы
+Файл	Статус
+login	переведено
+register	в очереди
+client	в очереди
+dashboard	в очереди
+psychologist	в очереди
+admin	в очереди
+become-psychologist	в очереди
+application-history	в очереди
+room	в очереди
+index	в очереди
+4. Библиотеки
+Файл	Что
+supabase.js	Единый клиент
+5. Компоненты
+
+Планируется: Sidebar.js, Topbar.js, Logo.js.
+6. Хранилище
+
+Таблицы: profiles, psychologist_profiles, events, sessions, reviews, notifications, chats, messages, applications, application_events, client_notes.
+
+Storage: avatars, documents.
+7. Роли
+
+client, psychologist, moderator, admin, owner.
+8. Технический долг
+
+    Сайдбар, шапка, логотип — в компоненты.
+
+    PsyHelp → Eupsy.
+
+    Старые JS — в модули.
+
+    index.html — заменить.
+
+9. Документация
+
+    state.md
+
+    architecture.md
+
+    theme-guide.md
+
+    start-chat.txt

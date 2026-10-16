@@ -43,3 +43,37 @@
 Прилагаю: state.md, architecture.md, theme-guide.md.
 
 С чего продолжим: [задача]
+
+Привет. Я делаю Eupsy — платформу для психологов.
+
+Стек v2:
+
+    HTML + CSS + JS (модули) + Vite
+
+    Supabase (Auth, PostgreSQL, RLS, Storage)
+
+    Vercel (psy-platform-v2.vercel.app)
+
+    Репозиторий: github.com/alisavlg/psy-platform-v2
+
+Что происходит: переписываю проект в v2.
+v2: public/ для HTML, src/ для JS/CSS. Модули. Стили через import в JS.
+
+Что переведено: login.html.
+Что осталось: остальные страницы, компоненты, eupsy.ru, JaaS, ЮKassa.
+
+Правила:
+
+    Сначала логика — потом код.
+
+    Проверка после каждой страницы.
+
+    Один шаг — одна проверка.
+
+    Коммит после каждой задачи.
+
+    Обновить state.md.
+
+Прилагаю: state.md, architecture.md, theme-guide.md.
+
+С чего продолжим: [задача]
