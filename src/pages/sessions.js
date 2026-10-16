@@ -1,8 +1,10 @@
 // ============================================
-// РАЗДЕЛ «МОИ СЕССИИ» — из Supabase
+// РАЗДЕЛ «МОИ СЕССИИ» — модуль v2
 // ============================================
 
-console.log('[sessions.js] loaded');
+import { supa } from '@/lib/supabase.js';
+
+console.log('[sessions] loaded');
 
 const STATUS_LABELS = {
     confirmed: 'Подтверждена',
@@ -14,16 +16,9 @@ const STATUS_LABELS = {
 let sessionsTab = 'upcoming';
 let cachedSessions = [];
 
-async function waitForSupaSess(maxAttempts) {
-    return new Promise(function (resolve) {
-        var attempts = 0;
-        var timer = setInterval(function () {
-            attempts++;
-            if (window.supa) { clearInterval(timer); resolve(true); }
-            else if (attempts >= maxAttempts) { clearInterval(timer); resolve(false); }
-        }, 100);
-    });
-}
+// ============================================
+// Supabase
+// ============================================
 
 function getCurrentUserId() {
     try {
@@ -34,10 +29,10 @@ function getCurrentUserId() {
 
 async function loadClientSessions() {
     var userId = getCurrentUserId();
-    if (!userId || !window.supa) return [];
+    if (!userId || !supa) return [];
 
     try {
-        var result = await window.supa
+        var result = await supa
             .from('sessions')
             .select('*')
             .eq('client_id', userId)
@@ -51,7 +46,6 @@ async function loadClientSessions() {
 
         var sessions = result.data || [];
 
-        // Подгружаем аватары психологов
         if (sessions.length > 0) {
             var psyIds = [];
             sessions.forEach(function (s) {
@@ -61,7 +55,7 @@ async function loadClientSessions() {
             });
 
             if (psyIds.length > 0) {
-                var psyRes = await window.supa
+                var psyRes = await supa
                     .from('psychologist_profiles')
                     .select('id, avatar_url')
                     .in('id', psyIds);
@@ -80,6 +74,10 @@ async function loadClientSessions() {
     } catch (err) { return []; }
 }
 
+// ============================================
+// Классификация
+// ============================================
+
 function getSessionDateTime(session) {
     var parts = session.date.split('-');
     return new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]), session.hour, 0, 0);
@@ -88,7 +86,6 @@ function getSessionDateTime(session) {
 function isUpcoming(session) {
     var dt = getSessionDateTime(session);
     var now = new Date();
-    // Сессия считается активной в течение часа после начала
     var sessionEnd = new Date(dt.getTime() + 60 * 60000);
     return sessionEnd > now && session.status === 'confirmed';
 }
@@ -97,7 +94,11 @@ function isPast(session) {
     return !isUpcoming(session);
 }
 
-async function renderSessions(tab) {
+// ============================================
+// Отрисовка
+// ============================================
+
+export async function renderSessions(tab) {
     if (tab) sessionsTab = tab;
 
     var listEl = document.getElementById('sessionsList');
@@ -170,13 +171,12 @@ async function renderSessions(tab) {
                 '<a class="session-btn session-btn-profile" href="psychologist.html?id=' + session.psychologist_id + '">Профиль</a>';
         }
 
-        // В Истории — только ссылка на профиль психолога
-        if (sessionsTab === 'past' && session.status !== 'cancelled') {
+                if (sessionsTab === 'past') {
             actionsHtml +=
                 '<a class="session-btn session-btn-profile" href="psychologist.html?id=' + session.psychologist_id + '">Профиль психолога</a>';
         }
 
-                var avatarHtml;
+        var avatarHtml;
         if (session.psychologist_avatar) {
             avatarHtml = '<div class="session-card-avatar" style="background-image:url(' + session.psychologist_avatar + ');background-size:cover;background-position:center;"></div>';
         } else {
@@ -313,7 +313,7 @@ async function confirmCancel() {
     var refundPercent = hoursLeft >= 48 ? 100 : (hoursLeft >= 24 ? 50 : 0);
 
     try {
-        var updateResult = await window.supa
+        var updateResult = await supa
             .from('sessions')
             .update({
                 status: 'cancelled',
@@ -334,7 +334,7 @@ async function confirmCancel() {
     }
 
     try {
-        await window.supa.from('events').insert({
+        await supa.from('events').insert({
             owner_id: null,
             psychologist_id: session.psychologist_id,
             title: 'Свободно',
@@ -344,13 +344,12 @@ async function confirmCancel() {
         });
     } catch (err) {}
 
-        try {
-        await window.supa.from('events').delete().eq('session_id', cancellingId);
+    try {
+        await supa.from('events').delete().eq('session_id', cancellingId);
     } catch (err) {}
 
-    // Уведомление психологу — в Supabase
     try {
-        var psyProf = await window.supa
+        var psyProf = await supa
             .from('psychologist_profiles')
             .select('user_id')
             .eq('id', session.psychologist_id)
@@ -362,7 +361,7 @@ async function confirmCancel() {
             var c2 = (me.displayMiddleName || me.realMiddleName || '').trim();
             var clientDisplayName = (c1 + ' ' + c2).trim() || 'Клиент';
 
-            await window.supa.from('notifications').insert({
+            await supa.from('notifications').insert({
                 user_id: psyProf.data.user_id,
                 type: 'session_cancelled',
                 title: 'Сессия отменена клиентом',
@@ -380,6 +379,10 @@ async function confirmCancel() {
     await renderSessions();
     alert('Сессия отменена.');
 }
+
+// ============================================
+// Утилиты
+// ============================================
 
 function formatHumanDate(date) {
     var months = ['янв', 'фев', 'мар', 'апр', 'май', 'июн', 'июл', 'авг', 'сен', 'окт', 'ноя', 'дек'];
@@ -403,27 +406,35 @@ function escapeHtml(text) {
     return div.innerHTML;
 }
 
-document.addEventListener('DOMContentLoaded', async function () {
-    await waitForSupaSess(50);
+// ============================================
+// Публичная инициализация
+// ============================================
+
+var sessionsBound = false;
+
+export async function initSessions() {
+    if (!sessionsBound) {
+        sessionsBound = true;
+
+        document.querySelectorAll('.session-tab-btn').forEach(function (btn) {
+            btn.addEventListener('click', function () {
+                renderSessions(btn.dataset.tab);
+            });
+        });
+
+        var confirmBtn = document.getElementById('confirmCancelBtn');
+        if (confirmBtn) confirmBtn.addEventListener('click', confirmCancel);
+
+        var cancelBtn = document.getElementById('cancelCancelBtn');
+        if (cancelBtn) cancelBtn.addEventListener('click', closeCancelModal);
+
+        var overlay = document.getElementById('cancelModalOverlay');
+        if (overlay) {
+            overlay.addEventListener('click', function (e) {
+                if (e.target.id === 'cancelModalOverlay') closeCancelModal();
+            });
+        }
+    }
 
     await renderSessions();
-
-    document.querySelectorAll('.session-tab-btn').forEach(function (btn) {
-        btn.addEventListener('click', function () {
-            renderSessions(btn.dataset.tab);
-        });
-    });
-
-    var confirmBtn = document.getElementById('confirmCancelBtn');
-    if (confirmBtn) confirmBtn.addEventListener('click', confirmCancel);
-
-    var cancelBtn = document.getElementById('cancelCancelBtn');
-    if (cancelBtn) cancelBtn.addEventListener('click', closeCancelModal);
-
-    var overlay = document.getElementById('cancelModalOverlay');
-    if (overlay) {
-        overlay.addEventListener('click', function (e) {
-            if (e.target.id === 'cancelModalOverlay') closeCancelModal();
-        });
-    }
-});
+}

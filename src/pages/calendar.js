@@ -22,6 +22,7 @@ const DEFAULT_SCROLL_HOUR = 8;
 let currentWeekStart = getMonday(new Date());
 let cachedEvents = [];
 let userPsychologistProfileId = null;
+let handlersBound = false;
 
 function getCurrentUser() {
     try { return JSON.parse(localStorage.getItem('psyhelp_user')) || {}; } catch (e) { return {}; }
@@ -239,7 +240,12 @@ async function renderCalendar() {
         });
     });
 
-    updateFreeSlotsCount();
+        updateFreeSlotsCount();
+
+    if (!handlersBound) {
+        handlersBound = true;
+        initCalendar();
+    }
 }
 
 function updateFreeSlotsCount() {
