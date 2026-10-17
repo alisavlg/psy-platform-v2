@@ -1,0 +1,383 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Кабинет психолога | Eupsy</title>
+</head>
+<body>
+
+    <div class="dashboard-layout">
+
+        <aside class="sidebar" id="appSidebar"></aside>
+
+        <div class="main-wrapper">
+
+            <header class="topbar" id="appTopbar"></header>
+
+            <div class="content-row">
+                <main class="main-content">
+
+                    <!-- КАЛЕНДАРЬ -->
+                    <div id="calendarSection">
+                        <div class="calendar-owner">
+                            Календарь: <strong id="calendarOwnerName">—</strong>
+                        </div>
+
+                        <div class="calendar-toolbar">
+                            <div class="calendar-nav">
+                                <button class="btn-nav" id="prevWeek">←</button>
+                                <span class="calendar-period" id="calendarPeriod">Сентябрь 2026</span>
+                                <button class="btn-nav" id="nextWeek">→</button>
+                                <button class="btn-today" id="todayBtn">Сегодня</button>
+                            </div>
+                            <div class="calendar-actions">
+                                <div class="category-legend">
+                                    <span class="legend-item"><span class="legend-dot" style="background:#4a90e2"></span>Свободно</span>
+                                    <span class="legend-item"><span class="legend-dot" style="background:#357abd"></span>Сессия</span>
+                                    <span class="legend-item"><span class="legend-dot" style="background:#2ecc71"></span>Личное</span>
+                                    <span class="legend-item"><span class="legend-dot" style="background:#f39c12"></span>Работа</span>
+                                    <span class="legend-item"><span class="legend-dot" style="background:#e74c3c"></span>Здоровье</span>
+                                    <span class="legend-item"><span class="legend-dot" style="background:#9b59b6"></span>Учёба</span>
+                                </div>
+                                <button class="btn-add-event" id="addEventBtn">+ Событие</button>
+                            </div>
+                        </div>
+
+                        <div class="calendar-quick-actions">
+                            <button class="btn-quick" id="fillWeekdaysBtn">Заполнить будни 10–19</button>
+                            <button class="btn-quick" id="fillWeekendBtn">Заполнить выходные 11–16</button>
+                            <button class="btn-quick danger" id="clearFreeSlotsBtn">Убрать все слоты</button>
+                            <span class="calendar-stats">
+                                Свободных слотов: <strong id="freeSlotsCount">0</strong>
+                            </span>
+                        </div>
+
+                        <div class="calendar-wrapper">
+                            <div class="calendar-grid" id="calendarGrid"></div>
+                        </div>
+
+                        <div class="calendar-info">
+                            💡 <strong>Подсказка:</strong> кликните по пустой ячейке и выберите <b>«Свободный слот»</b> —
+                            он станет виден клиентам для записи. Личные дела отмечайте другими категориями.
+                            <br>
+                            <b>Сессии</b> создаются автоматически при бронировании клиентом.
+                        </div>
+                    </div>
+
+                    <!-- СЕССИИ ПСИХОЛОГА (v1) -->
+                    <div id="sessionsSection" style="display:none;">
+                        <div class="sessions-header-row">
+                            <div class="sessions-tabs">
+                                <button class="psy-session-tab active" data-tab="upcoming">
+                                    Предстоящие <span class="session-tab-count" id="psyCountUpcoming">0</span>
+                                </button>
+                                <button class="psy-session-tab" data-tab="past">
+                                    История <span class="session-tab-count" id="psyCountPast">0</span>
+                                </button>
+                            </div>
+                            <button class="btn-clear-history" id="clearHistoryBtn" title="Удалить отменённые и завершённые сессии">
+                                Очистить историю
+                            </button>
+                        </div>
+                        <div class="sessions-list" id="psySessionsList"></div>
+                    </div>
+
+                    <!-- СООБЩЕНИЯ -->
+                    <div id="messagesSection" style="display:none;">
+                        <div class="messenger-hint">
+                            🔒 Все коммуникации — только внутри платформы. Контакты участников скрыты.
+                        </div>
+                        <div class="messenger-layout" id="messengerLayout">
+                            <div class="chats-panel">
+                                <div class="chats-header">
+                                    <h3>Чаты</h3>
+                                </div>
+                                <div class="chats-list" id="chatsList"></div>
+                            </div>
+                            <div class="chat-window" id="chatWindow"></div>
+                        </div>
+                    </div>
+
+                    <!-- ЛИЧНАЯ СТРАНИЦА (v1) -->
+                    <div id="profileSection" style="display:none;">
+                        <div class="profile-edit-container">
+
+                            <div class="profile-fio-block">
+                                <div class="profile-fio-header">
+                                    <h3>Персональные данные</h3>
+                                    <span class="verify-badge" id="verifyBadge">✓ Проверен</span>
+                                </div>
+                                <div class="profile-fio-row">
+                                    <div class="profile-fio-item">
+                                        <span class="profile-fio-label">Имя</span>
+                                        <span class="profile-fio-value" id="fioFirstName">—</span>
+                                    </div>
+                                    <div class="profile-fio-item">
+                                        <span class="profile-fio-label">Отчество</span>
+                                        <span class="profile-fio-value" id="fioMiddleName">—</span>
+                                    </div>
+                                </div>
+                                <div class="profile-fio-row">
+                                    <div class="profile-fio-item full">
+                                        <span class="profile-fio-label">Фамилия (не показывается публично)</span>
+                                        <span class="profile-fio-value" id="fioLastName">—</span>
+                                    </div>
+                                </div>
+                                <p class="profile-fio-hint">
+                                    ФИО подтверждается модератором на основании документов. Для изменения обратитесь в поддержку.
+                                </p>
+                            </div>
+
+                            <div class="profile-divider">
+                                <span>Редактируемая информация</span>
+                            </div>
+
+                            <form class="profile-edit-form" id="profileForm" novalidate>
+                                <div class="profile-edit-photo-block">
+                                    <div class="profile-edit-photo" id="profilePhotoPreview">Фото</div>
+                                    <input type="file" id="profilePhotoInput" accept="image/jpeg,image/png,image/webp" style="display:none;">
+                                    <button type="button" class="btn-photo" id="profilePhotoBtn">Загрузить фото</button>
+                                    <p class="form-hint">JPG или PNG, до 5 МБ</p>
+                                </div>
+
+                                <div class="form-group">
+                                    <label for="profileSpecialty">Специализация</label>
+                                    <input type="text" id="profileSpecialty" placeholder="Тревога, отношения, самооценка" required>
+                                    <span class="form-error" id="profileSpecialtyError"></span>
+                                </div>
+
+                                <div class="form-group">
+                                    <label for="profileDescription">Описание</label>
+                                    <textarea id="profileDescription" rows="5" placeholder="Расскажите о своём подходе..." required></textarea>
+                                    <span class="form-error" id="profileDescriptionError"></span>
+                                </div>
+
+                                <div class="form-row">
+                                    <div class="form-group">
+                                        <label for="profileExperience">Стаж (лет)</label>
+                                        <input type="number" id="profileExperience" min="0" max="60" placeholder="8" required>
+                                        <span class="form-error" id="profileExperienceError"></span>
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="profilePrice">Цена за сессию (₽)</label>
+                                        <input type="number" id="profilePrice" min="0" placeholder="3000" required>
+                                        <span class="form-error" id="profilePriceError"></span>
+                                    </div>
+                                </div>
+
+                                <div class="form-group">
+                                    <label for="profileTimezone">Часовой пояс</label>
+                                    <select id="profileTimezone">
+                                        <option value="Europe/Kaliningrad">Калининград (UTC+2)</option>
+                                        <option value="Europe/Moscow">Москва (UTC+3)</option>
+                                        <option value="Europe/Samara">Самара (UTC+4)</option>
+                                        <option value="Asia/Yekaterinburg">Екатеринбург (UTC+5)</option>
+                                        <option value="Asia/Omsk">Омск (UTC+6)</option>
+                                        <option value="Asia/Krasnoyarsk">Красноярск (UTC+7)</option>
+                                        <option value="Asia/Irkutsk">Иркутск (UTC+8)</option>
+                                        <option value="Asia/Yakutsk">Якутск (UTC+9)</option>
+                                        <option value="Asia/Vladivostok">Владивосток (UTC+10)</option>
+                                        <option value="Asia/Magadan">Магадан (UTC+11)</option>
+                                        <option value="Asia/Kamchatka">Камчатка (UTC+12)</option>
+                                    </select>
+                                    <p class="form-hint">Влияет на отображение времени сессий.</p>
+                                </div>
+
+                                <div class="profile-edit-actions">
+                                    <button type="submit" class="btn-save-profile" id="saveProfileBtn">Сохранить изменения</button>
+                                    <a href="../index.html" target="_blank" class="btn-preview">Посмотреть на сайте ↗</a>
+                                </div>
+
+                                <div class="form-message" id="profileMessage"></div>
+                            </form>
+
+                            <div class="security-block">
+                                <h3>Безопасность</h3>
+
+                                <div class="password-status" id="passwordStatus">
+                                    <span class="password-status-icon" id="passwordStatusIcon">✓</span>
+                                    <div class="password-status-text">
+                                        <strong id="passwordStatusTitle">Пароль в порядке</strong>
+                                        <span id="passwordStatusDesc">Пароль был установлен недавно.</span>
+                                        <div class="password-age-bar">
+                                            <div class="password-age-fill" id="passwordAgeFill" style="width: 0%;"></div>
+                                        </div>
+                                        <div class="password-age-text" id="passwordAgeText"></div>
+                                    </div>
+                                </div>
+
+                                <button type="button" class="btn-change-password" id="changePasswordBtn">Сменить пароль</button>
+
+                                <div class="change-password-form" id="changePasswordForm">
+                                    <div class="form-group">
+                                        <label for="currentPassword">Текущий пароль</label>
+                                        <input type="password" id="currentPassword" placeholder="Введите текущий пароль">
+                                        <span class="form-error" id="currentPasswordError"></span>
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="newPassword">Новый пароль</label>
+                                        <input type="password" id="newPassword" placeholder="Латиница, цифры, символы">
+                                        <span class="form-error" id="newPasswordError"></span>
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="newPassword2">Повторите новый пароль</label>
+                                        <input type="password" id="newPassword2" placeholder="Ещё раз">
+                                        <span class="form-error" id="newPassword2Error"></span>
+                                    </div>
+
+                                    <div class="change-password-actions">
+                                        <button type="button" class="btn-confirm-password" id="confirmPasswordBtn">Сменить</button>
+                                        <button type="button" class="btn-cancel-password" id="cancelPasswordBtn">Отмена</button>
+                                    </div>
+
+                                    <div class="change-password-message" id="changePasswordMessage"></div>
+                                </div>
+                            </div>
+
+                        </div>
+                    </div>
+
+                    <!-- ОТЧЁТЫ (v1) -->
+                    <div id="reportsSection" style="display:none;">
+                        <div style="background:#fff3cd;border-left:4px solid #f0ad4e;padding:14px 20px;border-radius:10px;margin-bottom:20px;color:#856404;">
+                            ⚙️ Раздел в разработке. Здесь появится доход по месяцам, средний чек, возвраты и список платежей — после подключения оплаты.
+                        </div>
+
+                        <div class="payments-summary" id="paymentsSummary">
+                            <div class="summary-card">
+                                <span class="summary-label">За месяц</span>
+                                <span class="summary-value" id="sumMonth">0 ₽</span>
+                            </div>
+                            <div class="summary-card">
+                                <span class="summary-label">За всё время</span>
+                                <span class="summary-value" id="sumTotal">0 ₽</span>
+                            </div>
+                            <div class="summary-card">
+                                <span class="summary-label">Средний чек</span>
+                                <span class="summary-value" id="sumAverage">0 ₽</span>
+                            </div>
+                            <div class="summary-card">
+                                <span class="summary-label">Возвраты</span>
+                                <span class="summary-value" id="sumRefunds">0 ₽</span>
+                            </div>
+                        </div>
+
+                        <div class="reports-chart-card">
+                            <h3 class="reports-chart-title">Доход по месяцам</h3>
+                            <div class="reports-chart" id="reportsChart"></div>
+                        </div>
+
+                        <div class="payments-toolbar">
+                            <div class="payments-filters">
+                                <button class="filter-btn active" data-period="month">За месяц</button>
+                                <button class="filter-btn" data-period="week">За неделю</button>
+                                <button class="filter-btn" data-period="all">За всё время</button>
+                            </div>
+                            <div class="payments-count" id="paymentsCount">Всего: 0</div>
+                        </div>
+
+                        <div class="payments-list" id="paymentsList"></div>
+                    </div>
+
+                </main>
+            </div>
+        </div>
+    </div>
+
+    <!-- МОДАЛЬНОЕ ОКНО: СОБЫТИЕ -->
+    <div class="modal-overlay" id="modalOverlay">
+        <div class="modal">
+            <h3 id="modalTitle">Новое событие</h3>
+
+            <div class="form-group">
+                <label for="eventTitle">Название</label>
+                <input type="text" id="eventTitle" placeholder="Например: Обед, супервизия, тренировка">
+            </div>
+
+            <div class="form-group">
+                <label for="eventDate">Дата</label>
+                <input type="date" id="eventDate">
+            </div>
+
+            <div class="form-group">
+                <label for="eventHour">Время</label>
+                <select id="eventHour">
+                    <option value="0">00:00</option>
+                    <option value="1">01:00</option>
+                    <option value="2">02:00</option>
+                    <option value="3">03:00</option>
+                    <option value="4">04:00</option>
+                    <option value="5">05:00</option>
+                    <option value="6">06:00</option>
+                    <option value="7">07:00</option>
+                    <option value="8">08:00</option>
+                    <option value="9">09:00</option>
+                    <option value="10">10:00</option>
+                    <option value="11">11:00</option>
+                    <option value="12">12:00</option>
+                    <option value="13">13:00</option>
+                    <option value="14">14:00</option>
+                    <option value="15">15:00</option>
+                    <option value="16">16:00</option>
+                    <option value="17">17:00</option>
+                    <option value="18">18:00</option>
+                    <option value="19">19:00</option>
+                    <option value="20">20:00</option>
+                    <option value="21">21:00</option>
+                    <option value="22">22:00</option>
+                    <option value="23">23:00</option>
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label for="eventCategory">Категория</label>
+                <select id="eventCategory">
+                    <option value="free">🔵 Свободный слот (виден клиентам)</option>
+                    <option value="personal">🟢 Личное</option>
+                    <option value="work">🟠 Работа</option>
+                    <option value="health">🔴 Здоровье</option>
+                    <option value="study">🟣 Учёба</option>
+                </select>
+            </div>
+
+            <div class="modal-actions">
+                <button class="btn-save" id="saveBtn">Сохранить</button>
+                <button class="btn-cancel" id="cancelBtn">Отмена</button>
+            </div>
+            <button class="btn-delete" id="deleteBtn" style="display:none;">Удалить</button>
+        </div>
+    </div>
+
+    <!-- МОДАЛЬНОЕ ОКНО: КЛИЕНТ (сессия) -->
+    <div class="modal-overlay" id="clientModalOverlay">
+        <div class="modal modal-wide">
+            <h3 id="clientModalTitle">Сессия</h3>
+            <div id="clientModalContent"></div>
+            <div class="modal-actions">
+                <button class="btn-cancel" id="clientCancelBtn">Закрыть</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- МОДАЛЬНОЕ ОКНО: ОТМЕНА СЕССИИ -->
+    <div class="modal-overlay" id="cancelModalOverlay">
+        <div class="modal">
+            <h3>Отмена сессии</h3>
+            <div id="cancelSummary"></div>
+
+            <div class="form-group">
+                <label for="cancelReason">Причина (необязательно)</label>
+                <input type="text" id="cancelReason" placeholder="Например: заболел">
+            </div>
+
+            <div class="modal-actions">
+                <button class="btn-save" id="confirmCancelBtn" style="background:#e74c3c;">Отменить сессию</button>
+                <button class="btn-cancel" id="cancelCancelBtn">Оставить</button>
+            </div>
+        </div>
+    </div>
+
+    <script type="module" src="/src/pages/dashboard.js"></script>
+</body>
+</html>
