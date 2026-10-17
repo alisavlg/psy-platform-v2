@@ -290,13 +290,15 @@ function openModal(date, hour) {
     document.getElementById('eventTitle').value = '';
     document.getElementById('eventDate').value = date;
     document.getElementById('eventHour').value = hour;
-    document.getElementById('eventCategory').value = isPsychologist() ? 'free' : 'personal';
+        document.getElementById('eventCategory').value = (window.CURRENT_USER === 'psychologist') ? 'free' : 'personal';
     document.getElementById('deleteBtn').style.display = 'none';
 
-    var catSelect = document.getElementById('eventCategory');
+        var catSelect = document.getElementById('eventCategory');
     if (catSelect) {
         var freeOption = catSelect.querySelector('option[value="free"]');
-        if (freeOption) freeOption.style.display = isPsychologist() ? '' : 'none';
+        if (freeOption) {
+            freeOption.style.display = (window.CURRENT_USER === 'psychologist') ? '' : 'none';
+        }
     }
 
     document.getElementById('modalOverlay').classList.add('active');
