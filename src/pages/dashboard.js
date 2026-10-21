@@ -24,9 +24,9 @@ import { initNotifications } from '@/components/Notifications.js';
 import { renderCalendar } from '@/pages/calendar.js';
 import { renderMessenger, initMessenger } from '@/pages/messenger.js';
 import { initPsySessions } from '@/pages/psychologist-sessions.js';
+import { initPsyProfile } from '@/pages/psychologist-profile.js';
 
 // Разделы v1 — ещё не переведены
-import '../../assets/js/profile.js';
 import '../../assets/js/reports.js';
 
 console.log('[dashboard] loaded');
@@ -39,9 +39,7 @@ var SECTIONS = {
     calendar: { title: 'Календарь',       id: 'calendarSection', init: renderCalendar },
     sessions: { title: 'Мои сессии',      id: 'sessionsSection', init: initPsySessions },
     messages: { title: 'Сообщения',       id: 'messagesSection', init: renderMessenger },
-    profile:  { title: 'Личная страница', id: 'profileSection',  init: function() {
-        if (typeof window.renderProfileForm === 'function') window.renderProfileForm();
-    }},
+    profile:  { title: 'Личная страница', id: 'profileSection',  init: initPsyProfile },
     reports:  { title: 'Отчёты',          id: 'reportsSection',  init: function() {
         if (typeof window.renderReports === 'function') window.renderReports('month');
     }}
