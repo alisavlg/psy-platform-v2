@@ -1,6 +1,8 @@
 // ============================================
-// РАЗДЕЛ «ОТЧЁТЫ»
+// РАЗДЕЛ «ОТЧЁТЫ» — модуль v2
 // ============================================
+
+console.log('[reports] loaded');
 
 const PAYMENTS_STORAGE_KEY = 'psyhelp_payments';
 
@@ -48,7 +50,7 @@ const STATUS_LABELS = {
 
 let currentPeriod = 'month';
 
-function renderReports(period) {
+export function renderReports(period) {
     if (period) currentPeriod = period;
 
     const listEl = document.getElementById('paymentsList');
@@ -97,7 +99,7 @@ function renderReports(period) {
 }
 
 // ============================================
-// ГРАФИК ДОХОДА ПО МЕСЯЦАМ
+// График
 // ============================================
 
 function renderChart(all) {
@@ -193,11 +195,22 @@ function formatPaymentDate(dateKey) {
     return parseInt(parts[2]) + ' ' + months[parseInt(parts[1]) - 1];
 }
 
-document.addEventListener('DOMContentLoaded', function () {
-    const filters = document.querySelectorAll('.filter-btn');
-    filters.forEach(function (btn) {
-        btn.addEventListener('click', function () {
-            renderReports(btn.dataset.period);
+// ============================================
+// Привязка фильтров
+// ============================================
+
+var reportsBound = false;
+
+export function initReports() {
+    if (!reportsBound) {
+        reportsBound = true;
+
+        document.querySelectorAll('.filter-btn').forEach(function (btn) {
+            btn.addEventListener('click', function () {
+                renderReports(btn.dataset.period);
+            });
         });
-    });
-});
+    }
+
+    renderReports('month');
+}

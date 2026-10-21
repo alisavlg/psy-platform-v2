@@ -25,9 +25,7 @@ import { renderCalendar } from '@/pages/calendar.js';
 import { renderMessenger, initMessenger } from '@/pages/messenger.js';
 import { initPsySessions } from '@/pages/psychologist-sessions.js';
 import { initPsyProfile } from '@/pages/psychologist-profile.js';
-
-// Разделы v1 — ещё не переведены
-import '../../assets/js/reports.js';
+import { initReports } from '@/pages/reports.js';
 
 console.log('[dashboard] loaded');
 
@@ -40,9 +38,7 @@ var SECTIONS = {
     sessions: { title: 'Мои сессии',      id: 'sessionsSection', init: initPsySessions },
     messages: { title: 'Сообщения',       id: 'messagesSection', init: renderMessenger },
     profile:  { title: 'Личная страница', id: 'profileSection',  init: initPsyProfile },
-    reports:  { title: 'Отчёты',          id: 'reportsSection',  init: function() {
-        if (typeof window.renderReports === 'function') window.renderReports('month');
-    }}
+    reports:  { title: 'Отчёты',          id: 'reportsSection',  init: initReports }
 };
 
 function getSectionFromURL() {

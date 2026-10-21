@@ -508,3 +508,19 @@
 .review-stars-input span:hover {
     transform: scale(1.15);
 }
+
+.review-highlight {
+    background: #fff9e6;
+    box-shadow: 0 0 0 3px #ffc107, 0 4px 12px rgba(255, 193, 7, 0.25);
+    transition: background 0.3s, box-shadow 0.3s;
+}
+
+.psy-action-reviewed {
+    cursor: pointer;
+    opacity: 0.6;
+    transition: opacity 0.2s;
+}
+
+.psy-action-reviewed:hover {
+    opacity: 1;
+}

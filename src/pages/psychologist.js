@@ -1,10 +1,27 @@
 // ============================================
-// ПРОФИЛЬ ПСИХОЛОГА + БРОНИРОВАНИЕ + ОТЗЫВЫ (Supabase)
+// ПРОФИЛЬ ПСИХОЛОГА — модуль v2
 // ============================================
 
-console.log('[psychologist.js] loaded');
+// Стили
+import '@/styles/theme.css';
+import '@/styles/dashboard.css';
+import '@/styles/calendar.css';
+import '@/styles/psychologist.css';
+import '@/styles/user-menu.css';
+import '@/styles/notifications.css';
 
-window.CURRENT_USER = window.CURRENT_USER || 'client';
+// Библиотеки
+import { supa } from '@/lib/supabase.js';
+
+// Компоненты
+import { renderSidebar } from '@/components/Sidebar.js';
+import { renderTopbar } from '@/components/Topbar.js';
+import { renderUserMenu } from '@/components/UserMenu.js';
+import { initNotifications } from '@/components/Notifications.js';
+
+console.log('[psychologist] loaded');
+
+window.CURRENT_USER = 'client';
 
 const DAYS_RU = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'];
 const MONTHS_RU = ['янв', 'фев', 'мар', 'апр', 'май', 'июн', 'июл', 'авг', 'сен', 'окт', 'ноя', 'дек'];
@@ -14,59 +31,7 @@ let currentSlot = null;
 let currentFilterDays = 7;
 let currentReviewRating = 0;
 let cachedReviews = [];
-
-// ============================================
-// Supabase helper
-// ============================================
-
-async function waitForSupaPsy(maxAttempts) {
-    return new Promise(function (resolve) {
-        var attempts = 0;
-        var timer = setInterval(function () {
-            attempts++;
-            if (window.supa) { clearInterval(timer); resolve(true); }
-            else if (attempts >= maxAttempts) { clearInterval(timer); resolve(false); }
-        }, 100);
-    });
-}
-
-function normalizePsychologist(row) {
-    return {
-        id: row.id,
-        userId: row.user_id || null,
-        firstName: row.first_name || '',
-        middleName: row.middle_name || '',
-        specialty: row.specialty || '',
-        description: row.description || '',
-        experience: row.experience || 0,
-        price: row.price || 0,
-        rating: Number(row.rating) || 0,
-        reviewsCount: row.reviews_count || 0,
-        isVerified: row.is_verified === true,
-        avatarUrl: row.avatar_url || ''
-    };
-}
-
-async function getPsychologistById(id) {
-    if (!window.supa) return null;
-    try {
-        var result = await window.supa
-            .from('psychologist_profiles')
-            .select('*')
-            .eq('id', id)
-            .single();
-
-        if (result.error || !result.data) {
-            console.error('[psychologist] не найден:', result.error);
-            return null;
-        }
-
-        return normalizePsychologist(result.data);
-    } catch (err) {
-        console.error('[psychologist] исключение:', err);
-        return null;
-    }
-}
+let isLoggedIn = false;
 
 // ============================================
 // Пользователь
@@ -122,14 +87,56 @@ function capitalizeWords(str) {
 }
 
 // ============================================
-// Слоты — из Supabase
+// Загрузка психолога
+// ============================================
+
+function normalizePsychologist(row) {
+    return {
+        id: row.id,
+        userId: row.user_id || null,
+        firstName: row.first_name || '',
+        middleName: row.middle_name || '',
+        specialty: row.specialty || '',
+        description: row.description || '',
+        experience: row.experience || 0,
+        price: row.price || 0,
+        rating: Number(row.rating) || 0,
+        reviewsCount: row.reviews_count || 0,
+        isVerified: row.is_verified === true,
+        avatarUrl: row.avatar_url || ''
+    };
+}
+
+async function getPsychologistById(id) {
+    if (!supa) return null;
+    try {
+        var result = await supa
+            .from('psychologist_profiles')
+            .select('*')
+            .eq('id', id)
+            .single();
+
+        if (result.error || !result.data) {
+            console.error('[psychologist] не найден:', result.error);
+            return null;
+        }
+
+        return normalizePsychologist(result.data);
+    } catch (err) {
+        console.error('[psychologist] исключение:', err);
+        return null;
+    }
+}
+
+// ============================================
+// Слоты
 // ============================================
 
 async function getSlotsFor(psy) {
-    if (!window.supa || !psy) return {};
+    if (!supa || !psy) return {};
 
     try {
-        var result = await window.supa
+        var result = await supa
             .from('events')
             .select('date, hour, category')
             .eq('psychologist_id', psy.id);
@@ -160,14 +167,14 @@ async function getSlotsFor(psy) {
 }
 
 // ============================================
-// ОТЗЫВЫ — из Supabase
+// Отзывы
 // ============================================
 
 async function loadReviewsFor(psyId) {
-    if (!window.supa || !psyId) return [];
+    if (!supa || !psyId) return [];
 
     try {
-        var result = await window.supa
+        var result = await supa
             .from('reviews')
             .select('*')
             .eq('psychologist_id', psyId)
@@ -191,10 +198,10 @@ function hasReviewedLocal(userId) {
 }
 
 async function findCompletedSessionId(psyId, userId) {
-    if (!window.supa || !psyId || !userId) return null;
+    if (!supa || !psyId || !userId) return null;
 
     try {
-        var result = await window.supa
+        var result = await supa
             .from('sessions')
             .select('id, date, hour')
             .eq('client_id', userId)
@@ -212,7 +219,6 @@ async function findCompletedSessionId(psyId, userId) {
                 parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]),
                 s.hour, 0, 0
             );
-            // Сессия прошла, если с момента начала прошёл час
             if (sessionDate.getTime() + 3600000 < now.getTime()) {
                 return s.id;
             }
@@ -225,10 +231,10 @@ async function findCompletedSessionId(psyId, userId) {
 }
 
 async function submitReviewToSupabase(data) {
-    if (!window.supa) return { success: false, error: 'Supabase не загружен' };
+    if (!supa) return { success: false, error: 'Supabase не загружен' };
 
     try {
-        var result = await window.supa.from('reviews').insert({
+        var result = await supa.from('reviews').insert({
             psychologist_id: data.psychologist_id,
             author_id: data.author_id,
             session_id: data.session_id,
@@ -309,12 +315,11 @@ async function renderProfile() {
         return;
     }
 
-    // Загружаем отзывы
     cachedReviews = await loadReviewsFor(currentPsy.id);
 
-    document.title = currentPsy.firstName + ' ' + currentPsy.middleName + ' | PsyHelp';
+    document.title = currentPsy.firstName + ' ' + currentPsy.middleName + ' | Eupsy';
 
-        const initials = getInitials(currentPsy.firstName + ' ' + currentPsy.middleName);
+    const initials = getInitials(currentPsy.firstName + ' ' + currentPsy.middleName);
     const fullName = currentPsy.firstName + ' ' + currentPsy.middleName;
     const stars = '★'.repeat(Math.round(currentPsy.rating)) + '☆'.repeat(5 - Math.round(currentPsy.rating));
 
@@ -325,19 +330,19 @@ async function renderProfile() {
         avatarHtml = '<div class="psy-profile-avatar">' + initials + '</div>';
     }
 
-        var myUserId = getCurrentUserId();
+    var myUserId = getCurrentUserId();
     var alreadyReviewed = myUserId && cachedReviews.some(function (r) {
         return r.author_id === myUserId;
     });
 
-    var reviewButtonHtml;
+        var reviewButtonHtml;
     if (alreadyReviewed) {
         reviewButtonHtml =
-            '<span class="psy-action-btn psy-action-review" ' +
-                'style="opacity:0.6;cursor:default;pointer-events:none;" ' +
-                'title="Вы уже оставили отзыв">' +
+            '<button type="button" class="psy-action-btn psy-action-review psy-action-reviewed" ' +
+                'id="myReviewBtn" ' +
+                'title="Перейти к вашему отзыву">' +
                 '✓ Ваш отзыв' +
-            '</span>';
+            '</button>';
     } else {
         reviewButtonHtml =
             '<button type="button" class="psy-action-btn psy-action-review" id="writeReviewBtn">' +
@@ -348,7 +353,7 @@ async function renderProfile() {
             '</button>';
     }
 
-        container.innerHTML =
+    container.innerHTML =
         '<div class="psy-profile-card">' +
             avatarHtml +
             '<div class="psy-profile-info">' +
@@ -429,6 +434,12 @@ async function renderProfile() {
         writeBtn.addEventListener('click', function () {
             if (!currentPsy) return;
 
+            if (!isLoggedIn) {
+                alert('Войдите в аккаунт, чтобы написать психологу.');
+                window.location.href = '/pages/login.html';
+                return;
+            }
+
             var clientUserId = getCurrentUserId();
             var psyUserId = getPsychologistUserId(currentPsy);
 
@@ -438,7 +449,7 @@ async function renderProfile() {
             }
 
             const chatId = 'chat-' + clientUserId + '-' + currentPsy.id;
-            window.location.href = 'client.html?section=messages&chat=' + encodeURIComponent(chatId) + '&psyId=' + encodeURIComponent(currentPsy.id);
+            window.location.href = '/pages/client.html?section=messages&chat=' + encodeURIComponent(chatId) + '&psyId=' + encodeURIComponent(currentPsy.id);
         });
     }
 
@@ -446,7 +457,35 @@ async function renderProfile() {
     if (reviewBtn) {
         reviewBtn.addEventListener('click', openReviewModal);
     }
-    // Если отзыв уже оставлен — элемента #writeReviewBtn нет, и это нормально
+
+    const myReviewBtn = document.getElementById('myReviewBtn');
+    if (myReviewBtn) {
+        myReviewBtn.addEventListener('click', function () {
+            var myId = getCurrentUserId();
+            var reviewEls = document.querySelectorAll('.review-item');
+            var myReviewEl = null;
+
+            // Ищем свой отзыв по порядку — если он есть в cachedReviews
+            var myIdx = -1;
+            for (var i = 0; i < cachedReviews.length; i++) {
+                if (cachedReviews[i].author_id === myId) { myIdx = i; break; }
+            }
+
+            if (myIdx !== -1 && reviewEls[myIdx]) {
+                myReviewEl = reviewEls[myIdx];
+            }
+
+            if (myReviewEl) {
+                myReviewEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                myReviewEl.classList.add('review-highlight');
+                setTimeout(function () { myReviewEl.classList.remove('review-highlight'); }, 2600);
+            } else {
+                // Fallback — просто прокрутка к секции отзывов
+                var reviewsSection = document.querySelector('.psy-reviews-section');
+                if (reviewsSection) reviewsSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }
+        });
+    }
 
     await renderSlots();
 }
@@ -457,6 +496,12 @@ async function renderProfile() {
 
 async function openReviewModal() {
     if (!currentPsy) return;
+
+    if (!isLoggedIn) {
+        alert('Войдите в аккаунт, чтобы оставить отзыв.');
+        window.location.href = '/pages/login.html';
+        return;
+    }
 
     var userId = getCurrentUserId();
 
@@ -608,14 +653,13 @@ async function submitReview() {
         return;
     }
 
-    // Перезагружаем отзывы и профиль (рейтинг тоже обновился триггером)
     closeReviewModal();
     await renderProfile();
     alert('✓ Спасибо за отзыв!');
 }
 
 // ============================================
-// Отрисовка слотов
+// Слоты
 // ============================================
 
 async function renderSlots() {
@@ -687,6 +731,11 @@ async function renderSlots() {
 
     grid.querySelectorAll('.slot-card').forEach(function (btn) {
         btn.addEventListener('click', function () {
+            if (!isLoggedIn) {
+                alert('Войдите в аккаунт, чтобы записаться.');
+                window.location.href = '/pages/login.html';
+                return;
+            }
             const dateStr = btn.dataset.date;
             const hour = parseInt(btn.dataset.hour);
             const parts = dateStr.split('-');
@@ -698,7 +747,7 @@ async function renderSlots() {
 }
 
 // ============================================
-// Модалка бронирования
+// Бронирование
 // ============================================
 
 function openBookingModal(slot) {
@@ -758,9 +807,8 @@ async function confirmBooking() {
     const bookedHour = currentSlot.hour;
     const bookedDateStr = formatDateKey(bookedDate);
 
-    // Проверка: у клиента нет события на это время
     try {
-        var clientEventsResult = await window.supa
+        var clientEventsResult = await supa
             .from('events')
             .select('id, category, title')
             .eq('owner_id', clientUserId)
@@ -813,9 +861,8 @@ async function confirmBooking() {
 
     const bookingId = 's-' + Date.now();
 
-    // Атомарно удаляем free-слот
     try {
-        var delResult = await window.supa
+        var delResult = await supa
             .from('events')
             .delete()
             .eq('psychologist_id', currentPsy.id)
@@ -842,9 +889,8 @@ async function confirmBooking() {
         return;
     }
 
-    // Создаём запись в sessions
     try {
-        var sessionResult = await window.supa.from('sessions').insert({
+        var sessionResult = await supa.from('sessions').insert({
             id: bookingId,
             client_id: clientUserId,
             psychologist_id: currentPsy.id,
@@ -869,10 +915,9 @@ async function confirmBooking() {
         return;
     }
 
-    // Событие в календаре психолога (только если у него есть реальный аккаунт)
     if (currentPsy.userId) {
         try {
-            await window.supa.from('events').insert({
+            await supa.from('events').insert({
                 owner_id: currentPsy.userId,
                 psychologist_id: currentPsy.id,
                 title: 'Сессия: ' + shortClientName,
@@ -889,9 +934,8 @@ async function confirmBooking() {
         }
     }
 
-    // Событие в календаре клиента
     try {
-        await window.supa.from('events').insert({
+        await supa.from('events').insert({
             owner_id: clientUserId,
             psychologist_id: currentPsy.id,
             title: 'Сессия: ' + shortPsyName,
@@ -905,35 +949,32 @@ async function confirmBooking() {
         console.warn('[booking] client event error:', err);
     }
 
-       // Уведомления в Supabase
     var dateTimeLabel = formatHumanDate(bookedDate) + ' в ' + String(bookedHour).padStart(2, '0') + ':00';
     var priceLabel = currentPsy.price.toLocaleString('ru-RU') + ' ₽';
     var psyName = currentPsy.firstName + ' ' + currentPsy.middleName;
 
-    // Клиенту
     try {
-        await window.supa.from('notifications').insert({
+        await supa.from('notifications').insert({
             user_id: clientUserId,
             type: 'session_booked',
             title: 'Сессия подтверждена',
             text: psyName + ' — ' + dateTimeLabel + '. Стоимость: ' + priceLabel + '. ' +
                   'Правила отмены: ≥48 ч — возврат 100%, 24–48 ч — 50%, <24 ч — без возврата.',
-            link: 'client.html?section=sessions&highlight=' + encodeURIComponent(bookingId)
+            link: '/pages/client.html?section=sessions&highlight=' + encodeURIComponent(bookingId)
         });
         console.log('[booking] notif client ok');
     } catch (e) {
         console.warn('[booking] notif client error:', e);
     }
 
-    // Психологу — если у него есть аккаунт
     if (currentPsy.userId && currentPsy.userId !== clientUserId) {
         try {
-            await window.supa.from('notifications').insert({
+            await supa.from('notifications').insert({
                 user_id: currentPsy.userId,
                 type: 'session_booked',
                 title: 'Новая сессия',
                 text: clientFullName + ' записался на ' + dateTimeLabel + '. Тема: ' + topic + '.',
-                link: 'dashboard.html?section=sessions&highlight=' + encodeURIComponent(bookingId)
+                link: '/pages/dashboard.html?section=sessions&highlight=' + encodeURIComponent(bookingId)
             });
             console.log('[booking] notif psy ok');
         } catch (e) {
@@ -988,8 +1029,18 @@ function escapeHtml(text) {
 // Инициализация
 // ============================================
 
-document.addEventListener('DOMContentLoaded', async function () {
-    await waitForSupaPsy(50);
+export async function initPsychologistPage() {
+    // Проверка авторизации
+    const user = getCurrentUserId();
+    isLoggedIn = !!user;
+
+    // Каркас — только для авторизованных
+    if (isLoggedIn) {
+        renderSidebar('client', 'catalog');
+        renderTopbar('Профиль психолога');
+        await renderUserMenu();
+        await initNotifications();
+    }
 
     await renderProfile();
 
@@ -1005,4 +1056,7 @@ document.addEventListener('DOMContentLoaded', async function () {
             if (e.target.id === 'bookingModalOverlay') closeBookingModal();
         });
     }
-});
+}
+
+// Автостарт
+document.addEventListener('DOMContentLoaded', initPsychologistPage);
