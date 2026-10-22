@@ -1,8 +1,19 @@
 // ============================================
-// ИСТОРИЯ ЗАЯВКИ НА РОЛЬ ПСИХОЛОГА
+// ИСТОРИЯ ЗАЯВКИ НА РОЛЬ ПСИХОЛОГА — модуль v2
 // ============================================
 
-console.log('[application-history.js] loaded');
+import '@/styles/theme.css';
+import '@/styles/dashboard.css';
+import '@/styles/user-menu.css';
+import '@/styles/notifications.css';
+
+import { supa } from '@/lib/supabase.js';
+import { renderSidebar } from '@/components/Sidebar.js';
+import { renderTopbar } from '@/components/Topbar.js';
+import { renderUserMenu } from '@/components/UserMenu.js';
+import { initNotifications } from '@/components/Notifications.js';
+
+console.log('[application-history] loaded');
 
 var STATUS_LABELS_HIST = {
     pending: 'Подана на проверку',
@@ -41,22 +52,11 @@ function formatDateTimeHist(iso) {
     return day + '.' + month + '.' + year + ' ' + h + ':' + m;
 }
 
-async function waitForSupaHist(maxAttempts) {
-    return new Promise(function (resolve) {
-        var attempts = 0;
-        var timer = setInterval(function () {
-            attempts++;
-            if (window.supa) { clearInterval(timer); resolve(true); }
-            else if (attempts >= maxAttempts) { clearInterval(timer); resolve(false); }
-        }, 100);
-    });
-}
-
 async function loadMyApplication() {
     var user = getCurrentUserHist();
     if (!user.id) return null;
 
-    var result = await window.supa
+    var result = await supa
         .from('applications')
         .select('*')
         .eq('user_id', user.id)
@@ -70,7 +70,7 @@ async function loadMyApplication() {
 
 async function loadHistory(appId) {
     if (!appId) return [];
-    var result = await window.supa
+    var result = await supa
         .from('application_events')
         .select('*')
         .eq('application_id', appId)
@@ -82,8 +82,9 @@ async function loadHistory(appId) {
     }
     return result.data || [];
 }
+
 // ============================================
-// Снимок заявки в событии — раскрывающийся блок
+// Снимок заявки
 // ============================================
 
 function renderSnapshotDetails(snapshot) {
@@ -96,7 +97,6 @@ function renderSnapshotDetails(snapshot) {
     if (!snap || typeof snap !== 'object') return '';
 
     var hasDocs = Array.isArray(snap.documents) && snap.documents.length > 0;
-
     var inner = '';
 
     if (snap.avatar_url) {
@@ -131,32 +131,24 @@ function renderSnapshotDetails(snapshot) {
     }
 
     if (hasDocs) {
-        var groupLabels = {
-            diplomas:     '📜 Дипломы',
-            certificates: '🏆 Сертификаты',
-            practice:     '🧠 Практика',
-            other:        '📎 Другое'
-        };
+        var groupLabels = { diplomas: '📜 Дипломы', certificates: '🏆 Сертификаты', practice: '🧠 Практика', other: '📎 Другое' };
         var grouped = { diplomas: [], certificates: [], practice: [], other: [] };
         snap.documents.forEach(function (d) {
             if (grouped[d.type]) grouped[d.type].push(d);
         });
 
-        inner += '<div style="margin-top:10px;">' +
-            '<div style="font-weight:600;font-size:13px;color:#333;margin-bottom:6px;">Документы (' + snap.documents.length + ')</div>';
+        inner += '<div style="margin-top:10px;"><div style="font-weight:600;font-size:13px;color:#333;margin-bottom:6px;">Документы (' + snap.documents.length + ')</div>';
 
         Object.keys(grouped).forEach(function (cat) {
             var arr = grouped[cat];
             if (arr.length === 0) return;
-            inner += '<div style="margin-bottom:8px;">' +
-                '<div style="font-size:12px;color:#777;margin-bottom:4px;">' + groupLabels[cat] + '</div>';
+            inner += '<div style="margin-bottom:8px;"><div style="font-size:12px;color:#777;margin-bottom:4px;">' + groupLabels[cat] + '</div>';
             arr.forEach(function (d) {
                 var isPdf = (d.name || '').toLowerCase().endsWith('.pdf');
-                inner +=
-                    '<a href="' + d.url + '" target="_blank" style="display:flex;align-items:center;gap:8px;padding:6px 10px;background:#fff;border:1px solid #e0e7ef;border-radius:6px;margin-bottom:4px;text-decoration:none;color:#333;font-size:12px;">' +
-                        '<span>' + (isPdf ? '📄' : '🖼') + '</span>' +
-                        '<span style="flex:1;">' + escapeHtmlHist(d.name || 'Документ') + '</span>' +
-                    '</a>';
+                inner += '<a href="' + d.url + '" target="_blank" style="display:flex;align-items:center;gap:8px;padding:6px 10px;background:#fff;border:1px solid #e0e7ef;border-radius:6px;margin-bottom:4px;text-decoration:none;color:#333;font-size:12px;">' +
+                            '<span>' + (isPdf ? '📄' : '🖼') + '</span>' +
+                            '<span style="flex:1;">' + escapeHtmlHist(d.name || 'Документ') + '</span>' +
+                        '</a>';
             });
             inner += '</div>';
         });
@@ -169,7 +161,6 @@ function renderSnapshotDetails(snapshot) {
     '</details>';
 }
 
-
 function render(app, history) {
     var el = document.getElementById('historyContent');
     if (!el) return;
@@ -180,7 +171,7 @@ function render(app, history) {
                 '<h2 style="color:#333;">Заявок пока нет</h2>' +
                 '<p style="color:#777;margin-top:12px;">Вы ещё не подавали заявку на роль психолога.</p>' +
                 '<div style="margin-top:24px;">' +
-                    '<a href="become-psychologist.html" style="display:inline-block;background:#4a90e2;color:#fff;padding:12px 28px;border-radius:50px;text-decoration:none;font-weight:600;">Подать заявку →</a>' +
+                    '<a href="/pages/become-psychologist.html" style="display:inline-block;background:#4a90e2;color:#fff;padding:12px 28px;border-radius:50px;text-decoration:none;font-weight:600;">Подать заявку →</a>' +
                 '</div>' +
             '</div>';
         return;
@@ -189,7 +180,6 @@ function render(app, history) {
     var statusLabel = STATUS_LABELS_HIST[app.status] || app.status;
     var statusColor = STATUS_COLORS_HIST[app.status] || '#999';
 
-    // Текущее состояние заявки
     var html =
         '<div style="background:#fff;border-radius:16px;padding:24px;box-shadow:0 2px 8px rgba(0,0,0,0.05);margin-bottom:20px;">' +
             '<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:16px;flex-wrap:wrap;">' +
@@ -217,24 +207,22 @@ function render(app, history) {
                 '</div>' +
             '</div>' +
         '</div>';
-        // Кнопка «Редактировать» — если статус позволяет
+
     if (app.status === 'pending' || app.status === 'attention' || app.status === 'rejected') {
         var btnLabel = app.status === 'rejected' ? 'Подать заново' : 'Редактировать заявку';
         html +=
             '<div style="margin-bottom:20px;">' +
-                '<a href="become-psychologist.html" style="display:inline-block;background:#4a90e2;color:#fff;padding:12px 28px;border-radius:50px;text-decoration:none;font-weight:600;">' +
+                '<a href="/pages/become-psychologist.html" style="display:inline-block;background:#4a90e2;color:#fff;padding:12px 28px;border-radius:50px;text-decoration:none;font-weight:600;">' +
                     btnLabel + ' →' +
                 '</a>' +
             '</div>';
     }
 
-
-    // Таймлайн
     html +=
         '<div style="background:#fff;border-radius:16px;padding:24px;box-shadow:0 2px 8px rgba(0,0,0,0.05);">' +
             '<h2 style="font-size:18px;margin:0 0 20px;color:#333;">Хронология</h2>';
 
-       if (history.length === 0) {
+    if (history.length === 0) {
         html += '<p style="color:#888;">События пока не записаны.</p>';
     } else {
         html += '<div style="position:relative;">';
@@ -243,13 +231,10 @@ function render(app, history) {
             var col = STATUS_COLORS_HIST[h.status] || '#999';
             var isLast = (i === history.length - 1);
 
-            html +=
-                '<div style="position:relative;padding-left:32px;padding-bottom:' + (isLast ? '0' : '24px') + ';">';
-            // вертикальная линия
+            html += '<div style="position:relative;padding-left:32px;padding-bottom:' + (isLast ? '0' : '24px') + ';">';
             if (!isLast) {
                 html += '<div style="position:absolute;left:9px;top:20px;bottom:0;width:2px;background:#e0e7ef;"></div>';
             }
-            // точка
             html += '<div style="position:absolute;left:0;top:2px;width:20px;height:20px;border-radius:50%;background:' + col + ';border:3px solid #fff;box-shadow:0 0 0 1px ' + col + ';"></div>';
 
             html +=
@@ -265,19 +250,28 @@ function render(app, history) {
     }
 
     html += '</div>';
-
     el.innerHTML = html;
 }
 
-document.addEventListener('DOMContentLoaded', async function () {
-    var ready = await waitForSupaHist(50);
-    if (!ready) {
-        var el = document.getElementById('historyContent');
-        if (el) el.innerHTML = '<div class="placeholder"><p>Ошибка соединения</p></div>';
-        return;
-    }
+// ============================================
+// Инициализация
+// ============================================
 
+export async function initApplicationHistory() {
+    window.CURRENT_USER = 'client';
+
+    // Каркас
+    renderSidebar('client', 'profile');
+    renderTopbar('История заявки');
+    await renderUserMenu();
+    await initNotifications();
+
+    // Данные
     var app = await loadMyApplication();
     var history = app ? await loadHistory(app.id) : [];
+    
     render(app, history);
-});
+}
+
+// Автостарт
+document.addEventListener('DOMContentLoaded', initApplicationHistory);
