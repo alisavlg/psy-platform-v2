@@ -1,0 +1,347 @@
+/* ============================================
+   ПУБЛИЧНАЯ ГЛАВНАЯ — КАТАЛОГ
+   ============================================ */
+
+*, *::before, *::after {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: var(--font-family);
+    background-color: var(--color-bg);
+    color: var(--color-text);
+    line-height: 1.6;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+}
+
+/* Шапка */
+.index-header {
+    background: #fff;
+    padding: 16px 32px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+    position: sticky;
+    top: 0;
+    z-index: 50;
+}
+
+.index-logo {
+    font-size: 24px;
+    font-weight: 700;
+    color: var(--color-primary);
+    text-decoration: none;
+}
+
+.index-header-actions {
+    display: flex;
+    gap: 12px;
+    align-items: center;
+}
+
+.index-auth-link {
+    padding: 10px 18px;
+    border-radius: 10px;
+    font-weight: 600;
+    font-size: 14px;
+    text-decoration: none;
+    color: var(--color-primary);
+    border: 1px solid var(--color-primary);
+    transition: background 0.2s;
+}
+
+.index-auth-link:hover {
+    background: #f0f4fa;
+}
+
+.index-auth-btn {
+    padding: 10px 18px;
+    border-radius: 10px;
+    font-weight: 600;
+    font-size: 14px;
+    text-decoration: none;
+    color: #fff;
+    background: var(--color-primary);
+    transition: background 0.2s;
+}
+
+.index-auth-btn:hover {
+    background: var(--color-primary-hover);
+}
+
+/* Hero */
+.index-hero {
+    text-align: center;
+    padding: 48px 20px 30px;
+    max-width: 800px;
+    margin: 0 auto;
+}
+
+.index-hero h1 {
+    font-size: 36px;
+    font-weight: 700;
+    color: var(--color-heading);
+    margin-bottom: 10px;
+}
+
+.index-hero p {
+    font-size: 17px;
+    color: var(--color-text-light);
+}
+
+/* Toolbar */
+.index-main {
+    flex: 1;
+    max-width: 960px;
+    width: 100%;
+    margin: 0 auto;
+    padding: 20px 24px 60px;
+}
+
+.index-toolbar {
+    display: grid;
+    grid-template-columns: 2fr 1fr 1fr 1fr 1fr 1fr;
+    gap: 10px;
+    margin-bottom: 16px;
+}
+
+.index-toolbar input,
+.index-toolbar select {
+    padding: 12px 14px;
+    border: 1px solid var(--color-border);
+    border-radius: 10px;
+    font-size: 14px;
+    font-family: var(--font-family);
+    color: var(--color-text);
+    background: #fff;
+    transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.index-toolbar input:focus,
+.index-toolbar select:focus {
+    outline: none;
+    border-color: var(--color-primary);
+    box-shadow: 0 0 0 3px rgba(74, 144, 226, 0.15);
+}
+
+.index-count {
+    font-size: 14px;
+    color: var(--color-text-muted);
+    margin-bottom: 16px;
+}
+
+/* Каталог */
+.index-catalog {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+}
+
+.index-card {
+    background: #fff;
+    border-radius: var(--radius-card);
+    padding: 24px;
+    box-shadow: var(--shadow-card);
+    display: flex;
+    gap: 20px;
+}
+
+.index-card-avatar {
+    width: 80px;
+    height: 80px;
+    border-radius: 50%;
+    background: var(--color-primary);
+    color: #fff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 26px;
+    font-weight: 700;
+    flex-shrink: 0;
+}
+
+.index-card-body {
+    flex: 1;
+    min-width: 0;
+}
+
+.index-card-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 4px;
+    flex-wrap: wrap;
+}
+
+.index-card-name {
+    font-size: 19px;
+    font-weight: 700;
+    color: var(--color-heading);
+}
+
+.index-card-badge {
+    background: #d4edda;
+    color: #155724;
+    font-size: 12px;
+    font-weight: 600;
+    padding: 3px 10px;
+    border-radius: 12px;
+}
+
+.index-card-specialty {
+    font-size: 14px;
+    color: var(--color-primary);
+    font-weight: 600;
+    margin-bottom: 8px;
+}
+
+.index-card-description {
+    font-size: 14px;
+    color: var(--color-text-light);
+    line-height: 1.55;
+    margin-bottom: 10px;
+}
+
+.index-card-meta {
+    display: flex;
+    gap: 20px;
+    font-size: 13px;
+    color: var(--color-text-light);
+    margin-bottom: 8px;
+    flex-wrap: wrap;
+}
+
+.index-card-meta strong {
+    color: var(--color-text);
+}
+
+.index-card-tags {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+    margin-bottom: 10px;
+}
+
+.index-card-tag {
+    font-size: 12px;
+    background: #f0f4fa;
+    color: var(--color-primary);
+    padding: 3px 9px;
+    border-radius: 8px;
+    font-weight: 500;
+}
+
+.index-card-rating {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 13px;
+    color: var(--color-text-light);
+    margin-bottom: 14px;
+}
+
+.index-card-stars {
+    color: #f5a623;
+    letter-spacing: 1px;
+}
+
+.index-card-btn {
+    padding: 12px 24px;
+    background: var(--color-primary);
+    color: #fff;
+    border: none;
+    border-radius: 10px;
+    font-size: 15px;
+    font-weight: 600;
+    cursor: pointer;
+    font-family: var(--font-family);
+    transition: background 0.2s;
+    width: 100%;
+    max-width: 320px;
+}
+
+.index-card-btn:hover {
+    background: var(--color-primary-hover);
+}
+
+.index-empty {
+    text-align: center;
+    padding: 60px 20px;
+    color: var(--color-text-light);
+    font-size: 15px;
+}
+
+.index-empty-icon {
+    font-size: 48px;
+    margin-bottom: 10px;
+}
+
+/* Футер */
+.index-footer {
+    text-align: center;
+    padding: 24px;
+    font-size: 13px;
+    color: var(--color-text-muted);
+    border-top: 1px solid var(--color-border);
+    background: #fff;
+}
+
+.index-footer a {
+    color: var(--color-text-muted);
+    text-decoration: none;
+}
+
+.index-footer a:hover {
+    color: var(--color-primary);
+}
+
+/* Адаптив */
+@media (max-width: 900px) {
+    .index-toolbar {
+        grid-template-columns: 1fr 1fr;
+    }
+    .index-toolbar input {
+        grid-column: 1 / -1;
+    }
+}
+
+@media (max-width: 600px) {
+    .index-header {
+        padding: 12px 16px;
+    }
+    .index-logo {
+        font-size: 20px;
+    }
+    .index-hero {
+        padding: 30px 16px 20px;
+    }
+    .index-hero h1 {
+        font-size: 26px;
+    }
+    .index-main {
+        padding: 16px;
+    }
+    .index-toolbar {
+        grid-template-columns: 1fr;
+    }
+    .index-card {
+        flex-direction: column;
+        align-items: center;
+        text-align: center;
+    }
+    .index-card-meta,
+    .index-card-rating {
+        justify-content: center;
+    }
+    .index-card-tags {
+        justify-content: center;
+    }
+    .index-card-btn {
+        max-width: 100%;
+    }
+}

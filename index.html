@@ -3,68 +3,82 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Психолог | PsyHelp</title>
-    <link rel="stylesheet" href="assets/css/theme.css">
-    <link rel="stylesheet" href="assets/css/style.css">
+    <title>Eupsy — найти психолога</title>
 </head>
 <body>
-    <header class="header">
-        <a href="index.html" class="logo">PsyHelp</a>
-        <nav class="nav">
-            <a href="pages/login.html">Войти</a>
-            <a href="pages/register.html" class="nav-btn">Регистрация</a>
-        </nav>
+
+    <header class="index-header">
+        <a href="/index.html" class="index-logo">Eupsy</a>
+        <div class="index-header-actions" id="indexHeaderActions"></div>
     </header>
 
-    <main class="profile-container">
-        <div class="profile-card">
-            <div class="profile-photo" id="publicPhoto">Фото</div>
-            <h1 class="profile-name" id="publicName">Анна Сергеевна</h1>
-            <div class="profile-badge-row">
-                <span class="public-badge" id="publicBadge" style="display:none;">
-                    ✓ Профиль проверен
-                </span>
-            </div>
-            <p class="profile-specialty" id="publicSpecialty">Тревога, отношения, самооценка</p>
-            <p class="profile-description" id="publicDescription">
-                Помогаю справляться с тревогой, строить здоровые отношения и повышать самооценку. 
-                Работаю в методах КПТ и гештальт-терапии. Онлайн-сессии.
-            </p>
-            <div class="profile-details">
-                <span class="profile-experience" id="publicExperience">Стаж: 8 лет</span>
-                <span class="profile-price" id="publicPrice">3 000 ₽ / сессия</span>
-            </div>
-            <button class="btn-book">Записаться на сессию</button>
+    <section class="index-hero">
+        <h1>Найдите своего психолога</h1>
+        <p>Проверенные специалисты. Конфиденциально. Онлайн.</p>
+    </section>
+
+    <main class="index-main">
+
+        <div class="index-toolbar">
+            <input type="text" id="indexSearch" placeholder="Поиск по имени или специализации...">
+
+            <select id="indexFilterSpecialty">
+                <option value="">Все специализации</option>
+                <option value="Тревога">Тревога</option>
+                <option value="Отношения">Отношения</option>
+                <option value="Самооценка">Самооценка</option>
+                <option value="Депрессия">Депрессия</option>
+                <option value="Детская психология">Детская психология</option>
+                <option value="Семейная терапия">Семейная терапия</option>
+            </select>
+
+            <select id="indexFilterMethod">
+                <option value="">Любой метод</option>
+                <option value="КПТ">КПТ</option>
+                <option value="Гештальт">Гештальт</option>
+                <option value="Психоанализ">Психоанализ</option>
+                <option value="АСТ">АСТ</option>
+                <option value="EMDR">EMDR</option>
+                <option value="Семейная терапия">Семейная терапия</option>
+                <option value="Детская психология">Детская психология</option>
+            </select>
+
+            <select id="indexFilterExperience">
+                <option value="">Любой опыт</option>
+                <option value="none">Нет опыта</option>
+                <option value="1-5">1–5 лет</option>
+                <option value="6-10">6–10 лет</option>
+                <option value="10+">Более 10 лет</option>
+            </select>
+
+            <select id="indexFilterLanguage">
+                <option value="">Любой язык</option>
+                <option value="Русский">Русский</option>
+                <option value="Английский">Английский</option>
+                <option value="Немецкий">Немецкий</option>
+                <option value="Французский">Французский</option>
+                <option value="Испанский">Испанский</option>
+                <option value="Китайский">Китайский</option>
+            </select>
+
+            <select id="indexFilterPrice">
+                <option value="">Любая цена</option>
+                <option value="1500">до 1 500 ₽</option>
+                <option value="3000">до 3 000 ₽</option>
+                <option value="5000">до 5 000 ₽</option>
+            </select>
         </div>
 
-        <div class="reviews-section">
-            <h2>Отзывы клиентов</h2>
-            
-            <div class="review-card">
-                <div class="review-header">
-                    <span class="review-author">Елена</span>
-                    <span class="review-rating">★★★★★</span>
-                </div>
-                <p class="review-text">Очень помогла разобраться с тревогой. Анна внимательная и тактичная.</p>
-                <span class="review-date">12 января 2026</span>
-            </div>
+        <div class="index-count" id="indexCount">Найдено: 0</div>
 
-            <div class="review-card">
-                <div class="review-header">
-                    <span class="review-author">Дмитрий</span>
-                    <span class="review-rating">★★★★☆</span>
-                </div>
-                <p class="review-text">Профессиональный подход. Стало легче в отношениях с близкими.</p>
-                <span class="review-date">5 февраля 2026</span>
-            </div>
-        </div>
+        <div class="index-catalog" id="indexCatalog"></div>
+
     </main>
 
-    <footer class="footer">
-        <p>&copy; 2026 PsyHelp. Все права защищены.</p>
+    <footer class="index-footer">
+        <p>© 2026 Eupsy · <a href="/pages/terms.html">Условия</a> · <a href="/pages/consent.html">Согласие</a></p>
     </footer>
 
-    <script src="assets/js/script.js"></script>
-    <script src="assets/js/public-profile.js"></script>
+    <script type="module" src="/src/pages/index.js"></script>
 </body>
 </html>

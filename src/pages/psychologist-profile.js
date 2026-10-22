@@ -12,9 +12,17 @@ var PASSWORD_MAX_AGE_DAYS = 60;
 var psyProfileId = null;
 var handlersBound = false;
 
-// ============================================
-// Пользователь
-// ============================================
+function getSelectedValues(name) {
+    var checkboxes = document.querySelectorAll('input[name="' + name + '"]:checked');
+    return Array.from(checkboxes).map(function (cb) { return cb.value; });
+}
+
+function setSelectedValues(name, values) {
+    var checkboxes = document.querySelectorAll('input[name="' + name + '"]');
+    checkboxes.forEach(function (cb) {
+        cb.checked = Array.isArray(values) && values.indexOf(cb.value) !== -1;
+    });
+}
 
 function getUser() {
     var data = localStorage.getItem(PROFILE_USER_KEY);
@@ -26,44 +34,22 @@ function saveUser(user) {
     localStorage.setItem(PROFILE_USER_KEY, JSON.stringify(user));
 }
 
-// ============================================
-// Загрузка профиля психолога
-// ============================================
-
 async function loadPsyProfile() {
     var user = getUser();
     if (!user.id) return null;
 
-    var result = await supa
-        .from('psychologist_profiles')
-        .select('*')
-        .eq('user_id', user.id)
-        .single();
-
-    if (result.error || !result.data) {
-        console.warn('[psychologist-profile] psychologist_profiles не найден:', result.error);
-        return null;
-    }
+    var result = await supa.from('psychologist_profiles').select('*').eq('user_id', user.id).single();
+    if (result.error || !result.data) return null;
 
     psyProfileId = result.data.id;
 
     try {
-        var profRes = await supa
-            .from('profiles')
-            .select('timezone')
-            .eq('id', user.id)
-            .single();
-        if (profRes.data) {
-            result.data.timezone = profRes.data.timezone || 'Europe/Moscow';
-        }
+        var profRes = await supa.from('profiles').select('timezone').eq('id', user.id).single();
+        if (profRes.data) result.data.timezone = profRes.data.timezone || 'Europe/Moscow';
     } catch (e) {}
 
     return result.data;
 }
-
-// ============================================
-// Отрисовка
-// ============================================
 
 export async function renderProfileForm() {
     var user = getUser();
@@ -107,6 +93,31 @@ export async function renderProfileForm() {
     var tzEl = document.getElementById('profileTimezone');
     if (tzEl) tzEl.value = (psy && psy.timezone) || 'Europe/Moscow';
 
+    // Методы и языки
+    if (psy) {
+        setSelectedValues('prof-methods', psy.method || []);
+        setSelectedValues('prof-languages', psy.languages || []);
+    }
+
+    // Баннер
+    var banner = document.getElementById('profileFieldsBanner');
+    if (!banner) {
+        var container = document.querySelector('.profile-edit-container');
+        if (container) {
+            var bannerHtml =
+                '<div id="profileFieldsBanner" style="display:none;background:#fff3cd;border-left:4px solid #f0ad4e;padding:16px 20px;border-radius:10px;margin-bottom:20px;color:#856404;font-size:14px;">' +
+                    '⚠️ Заполните методы работы и языки консультаций — это поможет клиентам найти вас в каталоге.' +
+                '</div>';
+            container.insertAdjacentHTML('afterbegin', bannerHtml);
+            banner = document.getElementById('profileFieldsBanner');
+        }
+    }
+    if (banner) {
+        var hasMethods = psy && psy.method && psy.method.length > 0;
+        var hasLangs = psy && psy.languages && psy.languages.length > 0;
+        banner.style.display = (hasMethods && hasLangs) ? 'none' : 'block';
+    }
+
     if (photoEl) {
         if (psy && psy.avatar_url) {
             photoEl.style.backgroundImage = 'url(' + psy.avatar_url + ')';
@@ -121,10 +132,6 @@ export async function renderProfileForm() {
 
     renderPasswordStatus(user);
 }
-
-// ============================================
-// Статус пароля
-// ============================================
 
 function renderPasswordStatus(user) {
     var statusEl = document.getElementById('passwordStatus');
@@ -173,10 +180,6 @@ function renderPasswordStatus(user) {
     }
 }
 
-// ============================================
-// Сохранение профиля
-// ============================================
-
 async function handleProfileSave(e) {
     e.preventDefault();
 
@@ -186,7 +189,6 @@ async function handleProfileSave(e) {
     var price = parseInt(document.getElementById('profilePrice').value) || 0;
 
     var isValid = true;
-
     if (!specialty || specialty.length < 3) { showProfileError('profileSpecialty', 'Введите специализацию'); isValid = false; } else clearProfileError('profileSpecialty');
     if (!description || description.length < 20) { showProfileError('profileDescription', 'Описание минимум 20 символов'); isValid = false; } else clearProfileError('profileDescription');
     if (!experience || experience < 0) { showProfileError('profileExperience', 'Укажите стаж'); isValid = false; } else clearProfileError('profileExperience');
@@ -205,13 +207,18 @@ async function handleProfileSave(e) {
     var tzEl = document.getElementById('profileTimezone');
     var timezone = tzEl ? tzEl.value : 'Europe/Moscow';
 
+    var methods = getSelectedValues('prof-methods');
+    var langs = getSelectedValues('prof-languages');
+
     var result = await supa
         .from('psychologist_profiles')
         .update({
             specialty: specialty,
             description: description,
             experience: experience,
-            price: price
+            price: price,
+            method: methods,
+            languages: langs
         })
         .eq('id', psyProfileId);
 
@@ -228,11 +235,7 @@ async function handleProfileSave(e) {
     try {
         var user = getUser();
         if (user.id) {
-            await supa
-                .from('profiles')
-                .update({ timezone: timezone })
-                .eq('id', user.id);
-
+            await supa.from('profiles').update({ timezone: timezone }).eq('id', user.id);
             user.timezone = timezone;
             saveUser(user);
         }
@@ -244,6 +247,11 @@ async function handleProfileSave(e) {
         msg.className = 'form-message success';
         msg.textContent = '✓ Изменения сохранены.';
         setTimeout(function () { msg.className = 'form-message'; }, 3000);
+    }
+
+    var banner = document.getElementById('profileFieldsBanner');
+    if (banner) {
+        banner.style.display = (methods.length > 0 && langs.length > 0) ? 'none' : 'block';
     }
 }
 
@@ -266,10 +274,6 @@ function clearProfileError(fieldId) {
         if (g) g.classList.remove('has-error');
     }
 }
-
-// ============================================
-// Загрузка фото
-// ============================================
 
 async function handlePsyPhotoUpload(e) {
     var file = e.target.files && e.target.files[0];
@@ -306,12 +310,8 @@ async function handlePsyPhotoUpload(e) {
     if (photoEl) photoEl.style.opacity = '0.5';
 
     try {
-        var upRes = await supa.storage
-            .from('avatars')
-            .upload(path, file, { upsert: true, contentType: file.type });
-
+        var upRes = await supa.storage.from('avatars').upload(path, file, { upsert: true, contentType: file.type });
         if (upRes.error) {
-            console.error('[psychologist-profile] storage error:', upRes.error);
             alert('Ошибка загрузки: ' + upRes.error.message);
             if (photoEl) photoEl.style.opacity = '';
             return;
@@ -320,13 +320,8 @@ async function handlePsyPhotoUpload(e) {
         var urlRes = supa.storage.from('avatars').getPublicUrl(path);
         var publicUrl = urlRes.data.publicUrl;
 
-        var updRes = await supa
-            .from('psychologist_profiles')
-            .update({ avatar_url: publicUrl })
-            .eq('id', psyProfileId);
-
+        var updRes = await supa.from('psychologist_profiles').update({ avatar_url: publicUrl }).eq('id', psyProfileId);
         if (updRes.error) {
-            console.error('[psychologist-profile] update error:', updRes.error);
             alert('Не удалось сохранить ссылку: ' + updRes.error.message);
             if (photoEl) photoEl.style.opacity = '';
             return;
@@ -345,17 +340,12 @@ async function handlePsyPhotoUpload(e) {
         await renderUserMenu();
 
     } catch (err) {
-        console.error('[psychologist-profile] exception:', err);
         alert('Ошибка: ' + (err.message || 'попробуйте ещё раз'));
         if (photoEl) photoEl.style.opacity = '';
     }
 
     e.target.value = '';
 }
-
-// ============================================
-// Смена пароля
-// ============================================
 
 function toggleChangePasswordForm() {
     var form = document.getElementById('changePasswordForm');
@@ -365,16 +355,13 @@ function toggleChangePasswordForm() {
 function cancelChangePassword() {
     var form = document.getElementById('changePasswordForm');
     if (form) form.classList.remove('active');
-
     var cur = document.getElementById('currentPassword');
     var np = document.getElementById('newPassword');
     var np2 = document.getElementById('newPassword2');
     if (cur) cur.value = '';
     if (np) np.value = '';
     if (np2) np2.value = '';
-
     ['currentPassword', 'newPassword', 'newPassword2'].forEach(clearProfileError);
-
     var msg = document.getElementById('changePasswordMessage');
     if (msg) msg.className = 'change-password-message';
 }
@@ -386,58 +373,33 @@ async function handleChangePassword() {
     var msg = document.getElementById('changePasswordMessage');
 
     var isValid = true;
-
     if (!current) { showProfileError('currentPassword', 'Введите текущий пароль'); isValid = false; } else clearProfileError('currentPassword');
+    if (!newPwd) { showProfileError('newPassword', 'Введите новый пароль'); isValid = false; }
+    else if (/[а-яА-ЯёЁ]/.test(newPwd)) { showProfileError('newPassword', 'Только латинские буквы, цифры и символы'); isValid = false; }
+    else if (newPwd.length < 8) { showProfileError('newPassword', 'Минимум 8 символов'); isValid = false; }
+    else if (!/[a-zA-Z]/.test(newPwd) || !/\d/.test(newPwd)) { showProfileError('newPassword', 'Пароль должен содержать буквы и цифры'); isValid = false; }
+    else if (newPwd === current) { showProfileError('newPassword', 'Новый пароль должен отличаться'); isValid = false; }
+    else clearProfileError('newPassword');
 
-    if (!newPwd) {
-        showProfileError('newPassword', 'Введите новый пароль'); isValid = false;
-    } else if (/[а-яА-ЯёЁ]/.test(newPwd)) {
-        showProfileError('newPassword', 'Только латинские буквы, цифры и символы'); isValid = false;
-    } else if (newPwd.length < 8) {
-        showProfileError('newPassword', 'Минимум 8 символов'); isValid = false;
-    } else if (!/[a-zA-Z]/.test(newPwd) || !/\d/.test(newPwd)) {
-        showProfileError('newPassword', 'Пароль должен содержать буквы и цифры'); isValid = false;
-    } else if (newPwd === current) {
-        showProfileError('newPassword', 'Новый пароль должен отличаться'); isValid = false;
-    } else clearProfileError('newPassword');
-
-    if (!newPwd2) {
-        showProfileError('newPassword2', 'Повторите новый пароль'); isValid = false;
-    } else if (newPwd2 !== newPwd) {
-        showProfileError('newPassword2', 'Пароли не совпадают'); isValid = false;
-    } else clearProfileError('newPassword2');
+    if (!newPwd2) { showProfileError('newPassword2', 'Повторите новый пароль'); isValid = false; }
+    else if (newPwd2 !== newPwd) { showProfileError('newPassword2', 'Пароли не совпадают'); isValid = false; }
+    else clearProfileError('newPassword2');
 
     if (!isValid) return;
 
     try {
         var sessionResult = await supa.auth.getSession();
         if (!sessionResult.data.session) {
-            if (msg) {
-                msg.className = 'change-password-message error';
-                msg.textContent = 'Нет активной сессии';
-            }
+            if (msg) { msg.className = 'change-password-message error'; msg.textContent = 'Нет активной сессии'; }
             return;
         }
-
         var email = sessionResult.data.session.user.email;
-
-        var checkResult = await supa.auth.signInWithPassword({
-            email: email,
-            password: current
-        });
-
-        if (checkResult.error) {
-            showProfileError('currentPassword', 'Неверный текущий пароль');
-            return;
-        }
+        var checkResult = await supa.auth.signInWithPassword({ email: email, password: current });
+        if (checkResult.error) { showProfileError('currentPassword', 'Неверный текущий пароль'); return; }
 
         var updateResult = await supa.auth.updateUser({ password: newPwd });
-
         if (updateResult.error) {
-            if (msg) {
-                msg.className = 'change-password-message error';
-                msg.textContent = 'Ошибка: ' + updateResult.error.message;
-            }
+            if (msg) { msg.className = 'change-password-message error'; msg.textContent = 'Ошибка: ' + updateResult.error.message; }
             return;
         }
 
@@ -445,27 +407,13 @@ async function handleChangePassword() {
         user.passwordChangedAt = Date.now();
         saveUser(user);
 
-        if (msg) {
-            msg.className = 'change-password-message success';
-            msg.textContent = '✓ Пароль успешно изменён.';
-        }
-
+        if (msg) { msg.className = 'change-password-message success'; msg.textContent = '✓ Пароль успешно изменён.'; }
         renderPasswordStatus(user);
-
         setTimeout(function () { cancelChangePassword(); }, 2000);
-
     } catch (err) {
-        console.error('[psychologist-profile] пароль — исключение:', err);
-        if (msg) {
-            msg.className = 'change-password-message error';
-            msg.textContent = 'Ошибка: ' + (err.message || 'попробуйте ещё раз');
-        }
+        if (msg) { msg.className = 'change-password-message error'; msg.textContent = 'Ошибка: ' + (err.message || 'попробуйте ещё раз'); }
     }
 }
-
-// ============================================
-// Привязка обработчиков
-// ============================================
 
 function bindProfileHandlers() {
     if (handlersBound) return;
@@ -477,10 +425,7 @@ function bindProfileHandlers() {
     var photoBtn = document.getElementById('profilePhotoBtn');
     var photoInput = document.getElementById('profilePhotoInput');
     if (photoBtn && photoInput) {
-        photoBtn.onclick = function (e) {
-            e.preventDefault();
-            photoInput.click();
-        };
+        photoBtn.onclick = function (e) { e.preventDefault(); photoInput.click(); };
         photoInput.onchange = handlePsyPhotoUpload;
     }
 
@@ -493,10 +438,6 @@ function bindProfileHandlers() {
     var cancelBtn = document.getElementById('cancelPasswordBtn');
     if (cancelBtn) cancelBtn.addEventListener('click', cancelChangePassword);
 }
-
-// ============================================
-// Публичная инициализация
-// ============================================
 
 export async function initPsyProfile() {
     bindProfileHandlers();
