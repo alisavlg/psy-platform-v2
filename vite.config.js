@@ -14,15 +14,15 @@ export default defineConfig({
         rollupOptions: {
             input: {
                 main: resolve(__dirname, 'index.html'),
-                login: resolve(__dirname, 'public/pages/login.html'),
-                register: resolve(__dirname, 'public/pages/register.html'),
-                client: resolve(__dirname, 'public/pages/client.html'),
-                dashboard: resolve(__dirname, 'public/pages/dashboard.html'),
-                psychologist: resolve(__dirname, 'public/pages/psychologist.html'),
-                admin: resolve(__dirname, 'public/pages/admin.html'),
-                room: resolve(__dirname, 'public/pages/room.html'),
-                become: resolve(__dirname, 'public/pages/become-psychologist.html'),
-                history: resolve(__dirname, 'public/pages/application-history.html')
+                login: resolve(__dirname, 'pages/login.html'),
+                register: resolve(__dirname, 'pages/register.html'),
+                client: resolve(__dirname, 'pages/client.html'),
+                dashboard: resolve(__dirname, 'pages/dashboard.html'),
+                psychologist: resolve(__dirname, 'pages/psychologist.html'),
+                admin: resolve(__dirname, 'pages/admin.html'),
+                room: resolve(__dirname, 'pages/room.html'),
+                become: resolve(__dirname, 'pages/become-psychologist.html'),
+                history: resolve(__dirname, 'pages/application-history.html')
             }
         }
     },
