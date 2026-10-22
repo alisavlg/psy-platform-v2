@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Комната | Eupsy</title>
+    <!-- Jitsi API оставляем в HTML, чтобы он загрузился как можно раньше -->
+    <script src="https://meet.jit.si/external_api.js"></script>
+</head>
+<body>
+    <div class="room-layout">
+
+        <header class="room-topbar">
+            <div class="room-topbar-left">
+                <span class="room-status-dot" id="roomStatusDot"></span>
+                <span class="room-status-text" id="roomStatus">Загрузка комнаты...</span>
+            </div>
+            <div class="room-topbar-center">
+                <div class="room-peer-name" id="roomPeerName">—</div>
+                <div class="room-peer-role" id="roomPeerRole">—</div>
+            </div>
+            <div class="room-topbar-right">
+                <span class="room-my-name" id="roomMyName"></span>
+                <a class="room-leave-btn" id="leaveBtn" href="#">Завершить</a>
+            </div>
+        </header>
+
+        <main class="room-main" id="roomMain">
+            <div id="jitsiContainer" class="jitsi-container"></div>
+            <div class="room-loading" id="roomLoading">
+                <div class="room-loading-spinner"></div>
+                <p>Подключаемся к комнате...</p>
+            </div>
+        </main>
+
+    </div>
+
+    <script type="module" src="/src/pages/room.js"></script>
+</body>
+</html>

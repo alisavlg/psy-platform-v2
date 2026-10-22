@@ -1,8 +1,12 @@
 // ============================================
-// КОМНАТА — Jitsi Meet + Supabase
+// КОМНАТА — Jitsi Meet + Supabase (модуль v2)
 // ============================================
 
-console.log('[room.js] loaded');
+import '@/styles/theme.css';
+import '@/styles/room.css';
+import { supa } from '@/lib/supabase.js';
+
+console.log('[room] loaded');
 
 var currentSession = null;
 var currentRole = 'client';
@@ -11,17 +15,6 @@ var jitsiApi = null;
 // ============================================
 // Утилиты
 // ============================================
-
-async function waitForSupa(maxAttempts) {
-    return new Promise(function (resolve) {
-        var attempts = 0;
-        var timer = setInterval(function () {
-            attempts++;
-            if (window.supa) { clearInterval(timer); resolve(true); }
-            else if (attempts >= maxAttempts) { clearInterval(timer); resolve(false); }
-        }, 100);
-    });
-}
 
 function getMyUser() {
     try {
@@ -47,7 +40,7 @@ function getMyDisplayName() {
 // ============================================
 
 async function loadSession(sessionId) {
-    var result = await window.supa
+    var result = await supa
         .from('sessions')
         .select('*')
         .eq('id', sessionId)
@@ -60,21 +53,11 @@ async function loadSession(sessionId) {
     return result.data;
 }
 
-// ============================================
-// Определение отображаемых имён
-// ============================================
-
 function getPeerInfo(session) {
     if (currentRole === 'client') {
-        return {
-            name: session.psychologist_name || 'Психолог',
-            role: 'Психолог'
-        };
+        return { name: session.psychologist_name || 'Психолог', role: 'Психолог' };
     } else {
-        return {
-            name: session.client_name || 'Клиент',
-            role: 'Клиент'
-        };
+        return { name: session.client_name || 'Клиент', role: 'Клиент' };
     }
 }
 
@@ -83,7 +66,6 @@ function getPeerInfo(session) {
 // ============================================
 
 function buildRoomName(sessionId) {
-    // Безопасное имя комнаты — с префиксом psyhelp
     return 'psyhelp-' + sessionId.replace(/[^a-zA-Z0-9-]/g, '');
 }
 
@@ -91,14 +73,20 @@ function startJitsi(roomName, displayName) {
     var container = document.getElementById('jitsiContainer');
     if (!container) return;
 
+    // Проверка, что Jitsi API загрузился
+    if (typeof JitsiMeetExternalAPI === 'undefined') {
+        console.error('[room] JitsiMeetExternalAPI не загружен (возможно, блокировщик рекламы)');
+        setStatus('Ошибка подключения к видео', false);
+        hideLoading();
+        return;
+    }
+
     var options = {
         roomName: roomName,
         parentNode: container,
         width: '100%',
         height: '100%',
-        userInfo: {
-            displayName: displayName
-        },
+        userInfo: { displayName: displayName },
         configOverwrite: {
             prejoinConfig: { enabled: false },
             prejoinPageEnabled: false,
@@ -108,14 +96,8 @@ function startJitsi(roomName, displayName) {
             enableWelcomePage: false,
             requireDisplayName: false,
             toolbarButtons: [
-                'microphone',
-                'camera',
-                'desktop',
-                'chat',
-                'raisehand',
-                'tileview',
-                'settings',
-                'hangup'
+                'microphone', 'camera', 'desktop', 'chat',
+                'raisehand', 'tileview', 'settings', 'hangup'
             ],
             notifications: [],
             disableThirdPartyRequests: true
@@ -187,9 +169,9 @@ function leaveRoom(silent) {
     } catch (e) {}
 
     if (currentRole === 'psychologist') {
-        window.location.href = 'dashboard.html?section=sessions';
+        window.location.href = '/pages/dashboard.html?section=sessions';
     } else {
-        window.location.href = 'client.html?section=sessions';
+        window.location.href = '/pages/client.html?section=sessions';
     }
 }
 
@@ -198,13 +180,6 @@ function leaveRoom(silent) {
 // ============================================
 
 document.addEventListener('DOMContentLoaded', async function () {
-    var ready = await waitForSupa(50);
-    if (!ready) {
-        setStatus('Ошибка соединения', false);
-        hideLoading();
-        return;
-    }
-
     var params = new URLSearchParams(window.location.search);
     var sessionId = params.get('session');
     var role = params.get('role');
@@ -242,7 +217,7 @@ document.addEventListener('DOMContentLoaded', async function () {
     if (peerRoleEl) peerRoleEl.textContent = peer.role;
     if (myNameEl) myNameEl.textContent = 'Вы: ' + getMyDisplayName();
 
-    document.title = 'Сессия с ' + peer.name + ' | PsyHelp';
+    document.title = 'Сессия с ' + peer.name + ' | Eupsy';
 
     setStatus('Подключение...', false);
 
