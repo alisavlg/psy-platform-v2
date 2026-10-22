@@ -33,5 +33,8 @@ export const MENU = {
         { section: 'messages', href: '/pages/dashboard.html?section=messages', label: 'Сообщения',        icon: ICONS.chat, badge: true },
         { section: 'profile',  href: '/pages/dashboard.html?section=profile',  label: 'Личная страница',  icon: ICONS.user },
         { section: 'reports',  href: '/pages/dashboard.html?section=reports',  label: 'Отчёты',           icon: ICONS.chart }
+    ],
+    admin: [
+        { section: 'applications', href: '/pages/admin.html', label: 'Заявки', icon: ICONS.userCheck, badge: true }
     ]
 };

@@ -1,12 +1,24 @@
 // ============================================
-// АДМИНКА — заявки на роль психолога (Supabase)
+// АДМИНКА — заявки на роль психолога (модуль v2)
 // ============================================
 
-console.log('[admin.js] loaded');
+import '@/styles/theme.css';
+import '@/styles/dashboard.css';
+import '@/styles/user-menu.css';
+import '@/styles/admin.css';
+import '@/styles/notifications.css';
+
+import { supa } from '@/lib/supabase.js';
+import { renderSidebar } from '@/components/Sidebar.js';
+import { renderTopbar } from '@/components/Topbar.js';
+import { renderUserMenu } from '@/components/UserMenu.js';
+import { initNotifications, Notifications } from '@/components/Notifications.js';
+
+console.log('[admin] loaded');
 
 var currentApps = [];
 var currentAppId = null;
-var currentFilter = 'active'; // active | approved | rejected | all
+var currentFilter = 'active';
 
 function escapeHtml(text) {
     var div = document.createElement('div');
@@ -29,20 +41,9 @@ function statusLabel(s) {
     }[s] || s;
 }
 
-function waitForSupaAdmin(maxAttempts) {
-    return new Promise(function (resolve) {
-        var attempts = 0;
-        var timer = setInterval(function () {
-            attempts++;
-            if (window.supa) { clearInterval(timer); resolve(true); }
-            else if (attempts >= maxAttempts) { clearInterval(timer); resolve(false); }
-        }, 100);
-    });
-}
-
 async function loadApplications() {
     try {
-        var query = window.supa
+        var query = supa
             .from('applications')
             .select('*')
             .order('created_at', { ascending: false });
@@ -54,7 +55,6 @@ async function loadApplications() {
         } else if (currentFilter === 'rejected') {
             query = query.eq('status', 'rejected');
         }
-        // для 'all' — без фильтра
 
         var result = await query;
 
@@ -79,7 +79,6 @@ function render() {
         badge.textContent = pending || '';
     }
 
-    // Панель фильтров
     var filterBar =
         '<div class="admin-filters" id="adminFilters">' +
             '<button class="admin-filter-btn' + (currentFilter === 'active'   ? ' active' : '') + '" data-filter="active">Активные</button>' +
@@ -117,7 +116,7 @@ function render() {
     html += '</div>';
     listEl.innerHTML = html;
 
-        listEl.querySelectorAll('[data-action="open"]').forEach(function (btn) {
+    listEl.querySelectorAll('[data-action="open"]').forEach(function (btn) {
         btn.addEventListener('click', function () {
             openAppModal(btn.dataset.id);
         });
@@ -170,51 +169,19 @@ function openAppModal(appId) {
     var body = document.getElementById('appModalBody');
     body.innerHTML =
         avatarHtml +
-        '<div class="admin-field">' +
-            '<div class="admin-field-label">Клиент</div>' +
-            '<div class="admin-field-value">' + escapeHtml(a.user_name || 'Клиент') +
-                ' <span style="color:#999;font-size:13px;">' + escapeHtml(a.user_code || '') + '</span></div>' +
-        '</div>' +
-        '<div class="admin-field">' +
-            '<div class="admin-field-label">Специализация</div>' +
-            '<div class="admin-field-value">' + escapeHtml(a.specialty || '—') + '</div>' +
-        '</div>' +
-        '<div class="admin-field">' +
-            '<div class="admin-field-label">Стаж</div>' +
-            '<div class="admin-field-value">' + (a.experience || 0) + ' лет</div>' +
-        '</div>' +
-        '<div class="admin-field">' +
-            '<div class="admin-field-label">Цена за сессию</div>' +
-            '<div class="admin-field-value">' + (a.price || 0) + ' ₽</div>' +
-        '</div>' +
-        '<div class="admin-field">' +
-            '<div class="admin-field-label">Описание для каталога</div>' +
-            '<div class="admin-field-value">' + escapeHtml(a.description || '—') + '</div>' +
-        '</div>' +
-        '<div class="admin-field">' +
-            '<div class="admin-field-label">О себе (для модератора)</div>' +
-            '<div class="admin-field-value">' + escapeHtml(a.about || '—') + '</div>' +
-        '</div>' +
-                (a.qualifications
-            ? '<div class="admin-field">' +
-                '<div class="admin-field-label">Квалификация и достижения</div>' +
-                '<div class="admin-field-value">' + escapeHtml(a.qualifications) + '</div>' +
-              '</div>'
-            : '') +
-        '<div class="admin-field">' +
-            '<div class="admin-field-label">Документы</div>' +
-            '<div class="admin-field-value" id="appModalDocs"></div>' +
-        '</div>' +
-        '<div class="admin-field">' +
-            '<div class="admin-field-label">Комментарий клиенту (обязателен при отклонении / доработке)</div>' +
-            '<textarea id="appModalComment" class="admin-reject-reason" placeholder="Что не так, что нужно исправить или догрузить...">' +
-                escapeHtml(a.moderator_comment || '') +
-            '</textarea>' +
-        '</div>';
+        '<div class="admin-field"><div class="admin-field-label">Клиент</div><div class="admin-field-value">' + escapeHtml(a.user_name || 'Клиент') + ' <span style="color:#999;font-size:13px;">' + escapeHtml(a.user_code || '') + '</span></div></div>' +
+        '<div class="admin-field"><div class="admin-field-label">Специализация</div><div class="admin-field-value">' + escapeHtml(a.specialty || '—') + '</div></div>' +
+        '<div class="admin-field"><div class="admin-field-label">Стаж</div><div class="admin-field-value">' + (a.experience || 0) + ' лет</div></div>' +
+        '<div class="admin-field"><div class="admin-field-label">Цена за сессию</div><div class="admin-field-value">' + (a.price || 0) + ' ₽</div></div>' +
+        '<div class="admin-field"><div class="admin-field-label">Описание для каталога</div><div class="admin-field-value">' + escapeHtml(a.description || '—') + '</div></div>' +
+        '<div class="admin-field"><div class="admin-field-label">О себе (для модератора)</div><div class="admin-field-value">' + escapeHtml(a.about || '—') + '</div></div>' +
+        (a.qualifications ? '<div class="admin-field"><div class="admin-field-label">Квалификация и достижения</div><div class="admin-field-value">' + escapeHtml(a.qualifications) + '</div></div>' : '') +
+        '<div class="admin-field"><div class="admin-field-label">Документы</div><div class="admin-field-value" id="appModalDocs"></div></div>' +
+        '<div class="admin-field"><div class="admin-field-label">Комментарий клиенту (обязателен при отклонении / доработке)</div><textarea id="appModalComment" class="admin-reject-reason" placeholder="Что не так, что нужно исправить или догрузить...">' + escapeHtml(a.moderator_comment || '') + '</textarea></div>';
     
-        // История заявки — подгружаем асинхронно
+    // История заявки
     (async function () {
-                var histRes = await window.supa
+        var histRes = await supa
             .from('application_events')
             .select('status, comment, created_at, author_id, author_role, snapshot')
             .eq('application_id', appId)
@@ -222,92 +189,54 @@ function openAppModal(appId) {
 
         if (histRes.error || !histRes.data || histRes.data.length <= 1) return;
 
-        var html =
-            '<div class="admin-field" style="margin-top:20px;border-top:1px solid #ddd;padding-top:16px;">' +
-                '<div class="admin-field-label">История заявки</div>' +
-                '<div style="font-size:13px;color:#555;">';
+        var html = '<div class="admin-field" style="margin-top:20px;border-top:1px solid #ddd;padding-top:16px;"><div class="admin-field-label">История заявки</div><div style="font-size:13px;color:#555;">';
 
-                histRes.data.forEach(function (h) {
+        histRes.data.forEach(function (h) {
             var d = new Date(h.created_at);
-            var dateStr = d.toLocaleDateString('ru-RU') + ' ' +
-                String(d.getHours()).padStart(2, '0') + ':' +
-                String(d.getMinutes()).padStart(2, '0');
-            var lbl = {
-                pending: 'Подана',
-                approved: 'Одобрена',
-                rejected: 'Отклонена',
-                attention: 'Требует внимания'
-            }[h.status] || h.status;
-            var roleLbl = {
-                client: 'Клиент',
-                owner: 'Собственник',
-                admin: 'Администратор',
-                moderator: 'Модератор',
-                system: 'Система'
-            }[h.author_role] || '';
+            var dateStr = d.toLocaleDateString('ru-RU') + ' ' + String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0');
+            var lbl = { pending: 'Подана', approved: 'Одобрена', rejected: 'Отклонена', attention: 'Требует внимания' }[h.status] || h.status;
+            var roleLbl = { client: 'Клиент', owner: 'Собственник', admin: 'Администратор', moderator: 'Модератор', system: 'Система' }[h.author_role] || '';
 
-            html +=
-                '<div style="padding:8px 0;border-bottom:1px solid #eee;">' +
-                    '<div><strong>' + dateStr + '</strong> — ' + escapeHtml(lbl) +
-                        (roleLbl ? ' <span style="color:#999;font-size:12px;">(' + escapeHtml(roleLbl) + ')</span>' : '') +
-                    '</div>' +
-                    (h.comment ? '<div style="color:#777;margin-top:4px;">«' + escapeHtml(h.comment) + '»</div>' : '') +
-                    renderAdminSnapshot(h.snapshot) +
-                '</div>';
+            html += '<div style="padding:8px 0;border-bottom:1px solid #eee;">' +
+                        '<div><strong>' + dateStr + '</strong> — ' + escapeHtml(lbl) + (roleLbl ? ' <span style="color:#999;font-size:12px;">(' + escapeHtml(roleLbl) + ')</span>' : '') + '</div>' +
+                        (h.comment ? '<div style="color:#777;margin-top:4px;">«' + escapeHtml(h.comment) + '»</div>' : '') +
+                        renderAdminSnapshot(h.snapshot) +
+                    '</div>';
         });
 
         html += '</div></div>';
-
         var bodyEl = document.getElementById('appModalBody');
         if (bodyEl) bodyEl.insertAdjacentHTML('beforeend', html);
-    })(); 
+    })();
     
-        // Документы — рисуем отдельно
+    // Документы
     (function renderDocs() {
         var docsEl = document.getElementById('appModalDocs');
         if (!docsEl) return;
 
         var docs = a.documents;
-        if (!Array.isArray(docs)) {
-            try { docs = JSON.parse(a.documents || '[]'); } catch (e) { docs = []; }
-        }
-        if (!docs || docs.length === 0) {
-            docsEl.innerHTML = '<span style="color:#999;">Нет документов</span>';
-            return;
-        }
+        if (!Array.isArray(docs)) { try { docs = JSON.parse(a.documents || '[]'); } catch (e) { docs = []; } }
+        if (!docs || docs.length === 0) { docsEl.innerHTML = '<span style="color:#999;">Нет документов</span>'; return; }
 
-        var groupLabels = {
-            diplomas:     '📜 Дипломы',
-            certificates: '🏆 Сертификаты',
-            practice:     '🧠 Практика',
-            other:        '📎 Другое'
-        };
-
+        var groupLabels = { diplomas: '📜 Дипломы', certificates: '🏆 Сертификаты', practice: '🧠 Практика', other: '📎 Другое' };
         var grouped = { diplomas: [], certificates: [], practice: [], other: [] };
-        docs.forEach(function (d) {
-            if (grouped[d.type]) grouped[d.type].push(d);
-        });
+        docs.forEach(function (d) { if (grouped[d.type]) grouped[d.type].push(d); });
 
         var html = '';
         Object.keys(grouped).forEach(function (cat) {
             var arr = grouped[cat];
             if (arr.length === 0) return;
-            html += '<div style="margin-bottom:12px;">' +
-                '<div style="font-weight:600;font-size:13px;color:#333;margin-bottom:6px;">' +
-                    groupLabels[cat] + ' (' + arr.length + ')' +
-                '</div>';
+            html += '<div style="margin-bottom:12px;"><div style="font-weight:600;font-size:13px;color:#333;margin-bottom:6px;">' + groupLabels[cat] + ' (' + arr.length + ')</div>';
             arr.forEach(function (d) {
                 var isPdf = (d.name || '').toLowerCase().endsWith('.pdf');
-                html +=
-                    '<a href="' + d.url + '" target="_blank" style="display:flex;align-items:center;gap:10px;padding:8px 10px;background:#f8f9fb;border-radius:8px;margin-bottom:6px;text-decoration:none;color:#333;font-size:13px;">' +
-                        '<span style="font-size:18px;">' + (isPdf ? '📄' : '🖼') + '</span>' +
-                        '<span style="flex:1;">' + escapeHtml(d.name || 'Документ') + '</span>' +
-                        '<span style="color:#999;font-size:12px;">' + ((d.size || 0) / 1024).toFixed(0) + ' КБ</span>' +
-                    '</a>';
+                html += '<a href="' + d.url + '" target="_blank" style="display:flex;align-items:center;gap:10px;padding:8px 10px;background:#f8f9fb;border-radius:8px;margin-bottom:6px;text-decoration:none;color:#333;font-size:13px;">' +
+                            '<span style="font-size:18px;">' + (isPdf ? '📄' : '🖼') + '</span>' +
+                            '<span style="flex:1;">' + escapeHtml(d.name || 'Документ') + '</span>' +
+                            '<span style="color:#999;font-size:12px;">' + ((d.size || 0) / 1024).toFixed(0) + ' КБ</span>' +
+                        '</a>';
             });
             html += '</div>';
         });
-
         docsEl.innerHTML = html;
     })();
 
@@ -341,12 +270,10 @@ async function handleDecision(action) {
         return;
     }
 
-    var rpcName = action === 'approve' ? 'approve_application'
-                : action === 'reject'  ? 'reject_application'
-                :                        'request_attention';
+    var rpcName = action === 'approve' ? 'approve_application' : action === 'reject' ? 'reject_application' : 'request_attention';
 
     try {
-        var result = await window.supa.rpc(rpcName, {
+        var result = await supa.rpc(rpcName, {
             app_id: currentAppId,
             moderator_comment: comment || null
         });
@@ -357,42 +284,16 @@ async function handleDecision(action) {
             return;
         }
 
-        // Уведомление клиенту
         var app = currentApps.find(function (x) { return x.id === currentAppId; });
-        if (app && app.user_id && typeof window.Notifications !== 'undefined') {
+        if (app && app.user_id) {
             var notifMap = {
-                approve: {
-                    type: 'application_approved',
-                    title: 'Заявка одобрена',
-                    text: 'Ваша заявка на роль психолога одобрена. Кабинет психолога активирован.',
-                    link: 'dashboard.html?section=calendar'
-                },
-                reject: {
-                    type: 'application_rejected',
-                    title: 'Заявка отклонена',
-                    text: comment || 'Посмотрите комментарий в профиле.',
-                    link: 'become-psychologist.html'
-                },
-                attention: {
-                    type: 'application_attention',
-                    title: 'Требует внимания',
-                    text: comment || 'Посмотрите комментарий в профиле.',
-                    link: 'become-psychologist.html'
-                }
+                approve: { type: 'application_approved', title: 'Заявка одобрена', text: 'Ваша заявка на роль психолога одобрена. Кабинет психолога активирован.', link: '/pages/dashboard.html?section=calendar' },
+                reject: { type: 'application_rejected', title: 'Заявка отклонена', text: comment || 'Посмотрите комментарий в профиле.', link: '/pages/become-psychologist.html' },
+                attention: { type: 'application_attention', title: 'Требует внимания', text: comment || 'Посмотрите комментарий в профиле.', link: '/pages/become-psychologist.html' }
             };
             var notif = notifMap[action];
             if (notif) {
-                try {
-                    await window.supa.from('notifications').insert({
-                        user_id: app.user_id,
-                        type: notif.type,
-                        title: notif.title,
-                        text: notif.text,
-                        link: notif.link
-                    });
-                } catch (e) {
-                    console.warn('[admin] notification error:', e);
-                }
+                await Notifications.addFor(app.user_id, notif);
             }
         }
 
@@ -403,21 +304,17 @@ async function handleDecision(action) {
         alert('Ошибка: ' + (err.message || 'попробуйте ещё раз'));
     }
 }
+
 function renderAdminSnapshot(snapshot) {
     if (!snapshot) return '';
-
     var snap = snapshot;
-    if (typeof snap === 'string') {
-        try { snap = JSON.parse(snap); } catch (e) { return ''; }
-    }
+    if (typeof snap === 'string') { try { snap = JSON.parse(snap); } catch (e) { return ''; } }
     if (!snap || typeof snap !== 'object') return '';
 
     var hasDocs = Array.isArray(snap.documents) && snap.documents.length > 0;
     var inner = '';
 
-    if (snap.avatar_url) {
-        inner += '<img src="' + snap.avatar_url + '" style="width:48px;height:48px;object-fit:cover;border-radius:50%;margin-bottom:8px;">';
-    }
+    if (snap.avatar_url) { inner += '<img src="' + snap.avatar_url + '" style="width:48px;height:48px;object-fit:cover;border-radius:50%;margin-bottom:8px;">'; }
 
     inner += '<div style="font-size:13px;color:#333;line-height:1.6;">';
     if (snap.specialty) inner += '<div><strong>Специализация:</strong> ' + escapeHtml(snap.specialty) + '</div>';
@@ -425,85 +322,56 @@ function renderAdminSnapshot(snapshot) {
     if (snap.price !== undefined) inner += '<div><strong>Цена:</strong> ' + snap.price + ' ₽</div>';
     inner += '</div>';
 
-    if (snap.qualifications) {
-        inner += '<details style="margin-top:6px;font-size:12px;">' +
-            '<summary style="cursor:pointer;color:#4a90e2;">Квалификация и достижения</summary>' +
-            '<div style="margin-top:4px;white-space:pre-wrap;">' + escapeHtml(snap.qualifications) + '</div>' +
-        '</details>';
-    }
-
-    if (snap.about) {
-        inner += '<details style="margin-top:4px;font-size:12px;">' +
-            '<summary style="cursor:pointer;color:#4a90e2;">О себе (для модератора)</summary>' +
-            '<div style="margin-top:4px;white-space:pre-wrap;">' + escapeHtml(snap.about) + '</div>' +
-        '</details>';
-    }
+    if (snap.qualifications) { inner += '<details style="margin-top:6px;font-size:12px;"><summary style="cursor:pointer;color:#4a90e2;">Квалификация и достижения</summary><div style="margin-top:4px;white-space:pre-wrap;">' + escapeHtml(snap.qualifications) + '</div></details>'; }
+    if (snap.about) { inner += '<details style="margin-top:4px;font-size:12px;"><summary style="cursor:pointer;color:#4a90e2;">О себе (для модератора)</summary><div style="margin-top:4px;white-space:pre-wrap;">' + escapeHtml(snap.about) + '</div></details>'; }
 
     if (hasDocs) {
-        var groupLabels = {
-            diplomas:     '📜 Дипломы',
-            certificates: '🏆 Сертификаты',
-            practice:     '🧠 Практика',
-            other:        '📎 Другое'
-        };
+        var groupLabels = { diplomas: '📜 Дипломы', certificates: '🏆 Сертификаты', practice: '🧠 Практика', other: '📎 Другое' };
         var grouped = { diplomas: [], certificates: [], practice: [], other: [] };
-        snap.documents.forEach(function (d) {
-            if (grouped[d.type]) grouped[d.type].push(d);
-        });
+        snap.documents.forEach(function (d) { if (grouped[d.type]) grouped[d.type].push(d); });
 
-        inner += '<div style="margin-top:8px;">' +
-            '<div style="font-weight:600;font-size:12px;color:#333;margin-bottom:4px;">Документы (' + snap.documents.length + ')</div>';
-
+        inner += '<div style="margin-top:8px;"><div style="font-weight:600;font-size:12px;color:#333;margin-bottom:4px;">Документы (' + snap.documents.length + ')</div>';
         Object.keys(grouped).forEach(function (cat) {
             var arr = grouped[cat];
             if (arr.length === 0) return;
             inner += '<div style="font-size:11px;color:#777;margin-top:4px;">' + groupLabels[cat] + '</div>';
             arr.forEach(function (d) {
                 var isPdf = (d.name || '').toLowerCase().endsWith('.pdf');
-                inner +=
-                    '<a href="' + d.url + '" target="_blank" style="display:inline-flex;align-items:center;gap:6px;padding:4px 8px;background:#fff;border:1px solid #e0e7ef;border-radius:6px;margin:2px 4px 2px 0;text-decoration:none;color:#333;font-size:11px;">' +
-                        '<span>' + (isPdf ? '📄' : '🖼') + '</span>' +
-                        '<span>' + escapeHtml(d.name || 'Документ') + '</span>' +
-                    '</a>';
+                inner += '<a href="' + d.url + '" target="_blank" style="display:inline-flex;align-items:center;gap:6px;padding:4px 8px;background:#fff;border:1px solid #e0e7ef;border-radius:6px;margin:2px 4px 2px 0;text-decoration:none;color:#333;font-size:11px;"><span>' + (isPdf ? '📄' : '🖼') + '</span><span>' + escapeHtml(d.name || 'Документ') + '</span></a>';
             });
         });
         inner += '</div>';
     }
 
-    return '<details style="margin-top:8px;padding:8px 12px;background:#f8f9fb;border-radius:8px;">' +
-        '<summary style="cursor:pointer;font-size:12px;font-weight:600;color:#4a90e2;">Что было подано на этом этапе</summary>' +
-        '<div style="margin-top:8px;">' + inner + '</div>' +
-    '</details>';
+    return '<details style="margin-top:8px;padding:8px 12px;background:#f8f9fb;border-radius:8px;"><summary style="cursor:pointer;font-size:12px;font-weight:600;color:#4a90e2;">Что было подано на этом этапе</summary><div style="margin-top:8px;">' + inner + '</div></details>';
 }
-
 
 async function reload() {
     currentApps = await loadApplications();
     render();
 }
 
-document.addEventListener('DOMContentLoaded', async function () {
-    var ready = await waitForSupaAdmin(50);
-    if (!ready) {
-        alert('Не удалось подключиться к серверу.');
+export async function initAdmin() {
+    window.CURRENT_USER = 'admin';
+    
+    // СТРОГАЯ ПРОВЕРКА ДОСТУПА
+    var user = JSON.parse(localStorage.getItem('psyhelp_user') || '{}');
+    var roles = Array.isArray(user.roles) ? user.roles : [];
+
+    // Если нет ID, или нет роли owner/admin/moderator — выкидываем в кабинет клиента
+    if (!user.id || (roles.indexOf('owner') === -1 && roles.indexOf('admin') === -1 && roles.indexOf('moderator') === -1)) {
+        console.warn('[admin] Доступ запрещён. Вы не собственник.');
+        window.location.href = '/pages/client.html?section=catalog';
         return;
     }
 
-    // Скрыть вкладки «Мои задачи» и «Решения»
-    var hideTabs = ['tasks', 'decisions'];
-    hideTabs.forEach(function (t) {
-        var el = document.querySelector('[data-tab="' + t + '"]');
-        if (el) el.style.display = 'none';
-    });
-
-    // Скрыть role-switcher
-    var rs = document.querySelector('.role-switcher');
-    if (rs) rs.style.display = 'none';
-
-    // Убедиться, что вкладка «Заявки» активна
-    document.querySelectorAll('.sidebar-nav .nav-item').forEach(function (item) {
-        item.classList.toggle('active', item.dataset.tab === 'applications');
-    });
+    renderSidebar('admin', 'applications');
+    renderTopbar('Заявки на роль психолога');
+    await renderUserMenu();
+    await initNotifications();
 
     await reload();
-});
+}
+
+// Автостарт
+document.addEventListener('DOMContentLoaded', initAdmin);

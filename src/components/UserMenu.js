@@ -140,6 +140,19 @@ export async function renderUserMenu() {
             '</a>';
     }
 
+        // Добавляем кнопку Админки только для собственника/админа
+    if (roles.indexOf('owner') !== -1 || roles.indexOf('admin') !== -1 || roles.indexOf('moderator') !== -1) {
+        const isActive = currentRole === 'admin';
+        roleItemsHtml +=
+            '<a href="/pages/admin.html" class="user-menu-item' + (isActive ? ' active' : '') + '" data-role="admin">' +
+                '<svg class="user-menu-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' +
+                    '<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>' +
+                    '<polyline points="9 12 11 14 15 10"></polyline>' +
+                '</svg>' +
+                'Админка (Заявки)' +
+            '</a>';
+    }
+
     const settingsHref = currentRole === 'psychologist'
         ? '/pages/dashboard.html?section=profile'
         : '/pages/client.html?section=profile';
