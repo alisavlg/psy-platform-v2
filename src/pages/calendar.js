@@ -1,5 +1,5 @@
 // ============================================
-// Календарь — единый планировщик (модуль)
+// Календарь — единый планировщик (модуль v2)
 // ============================================
 
 import { supa } from '@/lib/supabase.js';
@@ -240,8 +240,8 @@ async function renderCalendar() {
         });
     });
 
-        updateFreeSlotsCount();
-
+    updateFreeSlotsCount();
+    
     if (!handlersBound) {
         handlersBound = true;
         initCalendar();
@@ -290,10 +290,10 @@ function openModal(date, hour) {
     document.getElementById('eventTitle').value = '';
     document.getElementById('eventDate').value = date;
     document.getElementById('eventHour').value = hour;
-        document.getElementById('eventCategory').value = (window.CURRENT_USER === 'psychologist') ? 'free' : 'personal';
+    document.getElementById('eventCategory').value = (window.CURRENT_USER === 'psychologist') ? 'free' : 'personal';
     document.getElementById('deleteBtn').style.display = 'none';
 
-        var catSelect = document.getElementById('eventCategory');
+    var catSelect = document.getElementById('eventCategory');
     if (catSelect) {
         var freeOption = catSelect.querySelector('option[value="free"]');
         if (freeOption) {
@@ -368,24 +368,24 @@ async function removeEvent() {
     await renderCalendar();
 }
 
+// ============================================
+// Заполнение по кнопкам (ИСПРАВЛЕНО)
+// ============================================
+
 async function fillWeekdays() {
     if (!isPsychologist()) return;
-    var today = new Date();
-    today.setHours(0, 0, 0, 0);
+    var startMonday = currentWeekStart; // Берем понедельник текущей отображаемой недели
     var userId = getCurrentUserId();
-    var added = 0;
     var inserts = [];
 
     for (var week = 0; week < 4; week++) {
-        for (var i = 0; i < 5; i++) {
-            var date = new Date(today);
-            date.setDate(today.getDate() + week * 7 + i);
+        for (var i = 0; i < 5; i++) { // Пн-Пт
+            var date = addDays(startMonday, week * 7 + i);
             var dateKey = formatDateKey(date);
             for (var h = 10; h < 19; h++) {
                 var exists = cachedEvents.some(function (e) { return e.date === dateKey && e.hour === h; });
                 if (!exists) {
                     inserts.push({ owner_id: userId, psychologist_id: userPsychologistProfileId, title: 'Свободно', date: dateKey, hour: h, category: 'free' });
-                    added++;
                 }
             }
         }
@@ -400,22 +400,18 @@ async function fillWeekdays() {
 
 async function fillWeekend() {
     if (!isPsychologist()) return;
-    var today = new Date();
-    today.setHours(0, 0, 0, 0);
+    var startMonday = currentWeekStart; // Берем понедельник текущей отображаемой недели
     var userId = getCurrentUserId();
-    var added = 0;
     var inserts = [];
 
     for (var week = 0; week < 4; week++) {
-        for (var i = 5; i < 7; i++) {
-            var date = new Date(today);
-            date.setDate(today.getDate() + week * 7 + i);
+        for (var i = 5; i < 7; i++) { // Сб-Вс
+            var date = addDays(startMonday, week * 7 + i);
             var dateKey = formatDateKey(date);
             for (var h = 11; h < 16; h++) {
                 var exists = cachedEvents.some(function (e) { return e.date === dateKey && e.hour === h; });
                 if (!exists) {
                     inserts.push({ owner_id: userId, psychologist_id: userPsychologistProfileId, title: 'Свободно', date: dateKey, hour: h, category: 'free' });
-                    added++;
                 }
             }
         }

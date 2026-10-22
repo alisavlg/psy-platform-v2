@@ -2,7 +2,6 @@
 // ПРОФИЛЬ ПСИХОЛОГА — модуль v2
 // ============================================
 
-// Стили
 import '@/styles/theme.css';
 import '@/styles/dashboard.css';
 import '@/styles/calendar.css';
@@ -10,10 +9,7 @@ import '@/styles/psychologist.css';
 import '@/styles/user-menu.css';
 import '@/styles/notifications.css';
 
-// Библиотеки
 import { supa } from '@/lib/supabase.js';
-
-// Компоненты
 import { renderSidebar } from '@/components/Sidebar.js';
 import { renderTopbar } from '@/components/Topbar.js';
 import { renderUserMenu } from '@/components/UserMenu.js';
@@ -335,7 +331,7 @@ async function renderProfile() {
         return r.author_id === myUserId;
     });
 
-        var reviewButtonHtml;
+    var reviewButtonHtml;
     if (alreadyReviewed) {
         reviewButtonHtml =
             '<button type="button" class="psy-action-btn psy-action-review psy-action-reviewed" ' +
@@ -453,7 +449,7 @@ async function renderProfile() {
         });
     }
 
-        const reviewBtn = document.getElementById('writeReviewBtn');
+    const reviewBtn = document.getElementById('writeReviewBtn');
     if (reviewBtn) {
         reviewBtn.addEventListener('click', openReviewModal);
     }
@@ -465,7 +461,6 @@ async function renderProfile() {
             var reviewEls = document.querySelectorAll('.review-item');
             var myReviewEl = null;
 
-            // Ищем свой отзыв по порядку — если он есть в cachedReviews
             var myIdx = -1;
             for (var i = 0; i < cachedReviews.length; i++) {
                 if (cachedReviews[i].author_id === myId) { myIdx = i; break; }
@@ -480,7 +475,6 @@ async function renderProfile() {
                 myReviewEl.classList.add('review-highlight');
                 setTimeout(function () { myReviewEl.classList.remove('review-highlight'); }, 2600);
             } else {
-                // Fallback — просто прокрутка к секции отзывов
                 var reviewsSection = document.querySelector('.psy-reviews-section');
                 if (reviewsSection) reviewsSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
             }
@@ -659,7 +653,7 @@ async function submitReview() {
 }
 
 // ============================================
-// Слоты
+// Слоты (с фильтрацией прошедшего времени)
 // ============================================
 
 async function renderSlots() {
@@ -672,6 +666,10 @@ async function renderSlots() {
 
     const today = new Date();
     today.setHours(0, 0, 0, 0);
+    
+    // Получаем текущий час для фильтрации прошедшего времени
+    const now = new Date();
+    const currentHour = now.getHours();
 
     const groups = {};
     const dateOrder = [];
@@ -684,6 +682,10 @@ async function renderSlots() {
 
         for (let h = 8; h < 22; h++) {
             if (slots[dateKey + '-' + h]) {
+                // Если это сегодня и время слота уже прошло — пропускаем
+                if (i === 0 && h <= currentHour) {
+                    continue;
+                }
                 if (!groups[dateKey]) {
                     groups[dateKey] = { date: date, isoDay: isoDay, hours: [] };
                     dateOrder.push(dateKey);
@@ -1030,11 +1032,9 @@ function escapeHtml(text) {
 // ============================================
 
 export async function initPsychologistPage() {
-    // Проверка авторизации
     const user = getCurrentUserId();
     isLoggedIn = !!user;
 
-    // Каркас — только для авторизованных
     if (isLoggedIn) {
         renderSidebar('client', 'catalog');
         renderTopbar('Профиль психолога');
@@ -1058,5 +1058,4 @@ export async function initPsychologistPage() {
     }
 }
 
-// Автостарт
 document.addEventListener('DOMContentLoaded', initPsychologistPage);
