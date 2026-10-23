@@ -1,5 +1,5 @@
 /* ============================================
-   ПУБЛИЧНАЯ ГЛАВНАЯ (только обертка)
+   ПУБЛИЧНАЯ ГЛАВНАЯ
    ============================================ */
 
 *, *::before, *::after {
@@ -12,13 +12,13 @@ body {
     font-family: var(--font-family);
     background-color: var(--color-bg);
     color: var(--color-text);
-    line-height: 1.6;
-    min-height: 100vh;
+    height: 100vh;
+    overflow: hidden; /* Запрещаем скролл всей страницы */
     display: flex;
     flex-direction: column;
 }
 
-/* Шапка */
+/* Шапка (Логотип и кнопки) */
 .index-header {
     background: #fff;
     padding: 16px 32px;
@@ -26,9 +26,8 @@ body {
     justify-content: space-between;
     align-items: center;
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
-    position: sticky;
-    top: 0;
-    z-index: 50;
+    flex-shrink: 0; /* Шапка не сжимается */
+    z-index: 100;
 }
 
 .index-logo {
@@ -77,13 +76,14 @@ body {
 /* Hero (Слоган) */
 .index-hero {
     text-align: center;
-    padding: 48px 20px 30px;
+    padding: 30px 20px 20px;
     max-width: 800px;
     margin: 0 auto;
+    flex-shrink: 0; /* Слоган не сжимается */
 }
 
 .index-hero h1 {
-    font-size: 36px;
+    font-size: 32px;
     font-weight: 700;
     color: var(--color-heading);
     margin-bottom: 10px;
@@ -94,13 +94,14 @@ body {
     color: var(--color-text-light);
 }
 
-/* Основной контейнер */
+/* Основной контейнер (Здесь происходит скролл) */
 .index-main {
     flex: 1;
     max-width: 960px;
     width: 100%;
     margin: 0 auto;
-    padding: 20px 24px 60px;
+    padding: 0 24px 60px 24px;
+    overflow-y: auto; /* СКРОЛЛИТСЯ ТОЛЬКО ЭТА ОБЛАСТЬ */
 }
 
 /* Футер */
@@ -111,6 +112,7 @@ body {
     color: var(--color-text-muted);
     border-top: 1px solid var(--color-border);
     background: #fff;
+    flex-shrink: 0;
 }
 
 .index-footer a {
@@ -120,23 +122,4 @@ body {
 
 .index-footer a:hover {
     color: var(--color-primary);
-}
-
-/* Адаптив (только для обертки) */
-@media (max-width: 600px) {
-    .index-header {
-        padding: 12px 16px;
-    }
-    .index-logo {
-        font-size: 20px;
-    }
-    .index-hero {
-        padding: 30px 16px 20px;
-    }
-    .index-hero h1 {
-        font-size: 26px;
-    }
-    .index-main {
-        padding: 16px;
-    }
 }
