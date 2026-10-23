@@ -10,6 +10,7 @@ import '@/styles/messenger.css';
 import '@/styles/sessions.css';
 import '@/styles/profile-client.css';
 import '@/styles/client.css';
+import '@/styles/catalog.css'; // <-- ВОТ ЭТА СТРОКА
 import '@/styles/user-menu.css';
 import '@/styles/notifications.css';
 
