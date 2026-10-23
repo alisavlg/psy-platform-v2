@@ -107,6 +107,7 @@ export async function renderCatalog() {
     filtered.forEach(function (psy) {
         var card = document.createElement('div');
         card.className = 'psy-card';
+        
         var initials = getInitials(psy.firstName + ' ' + psy.middleName);
         var fullName = psy.firstName + ' ' + psy.middleName;
         var stars = '★'.repeat(Math.round(psy.rating)) + '☆'.repeat(5 - Math.round(psy.rating));
@@ -115,7 +116,6 @@ export async function renderCatalog() {
             ? '<div class="psy-card-avatar" style="background-image:url(' + psy.avatarUrl + ');background-size:cover;background-position:center;"></div>'
             : '<div class="psy-card-avatar">' + initials + '</div>';
 
-        // Формируем теги методов и языков
         var tagsHtml = '';
         if (psy.method.length > 0) {
             psy.method.forEach(function (m) { tagsHtml += '<span class="psy-card-tag">' + escapeHtml(m) + '</span>'; });
