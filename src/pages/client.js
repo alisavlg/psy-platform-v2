@@ -46,7 +46,7 @@ async function initProfile() {
 // ============================================
 
 var SECTIONS = {
-    catalog:  { title: 'Найти психолога', id: 'catalogSection',  init: initCatalog },
+    catalog:  { title: 'Найти психолога', id: 'catalogSection',  init: function() { initCatalog('catalogSection'); } },
     sessions: { title: 'Мои сессии',      id: 'sessionsSection', init: initSessions },
     messages: { title: 'Сообщения',       id: 'messagesSection', init: renderMessenger },
     planner:  { title: 'Планировщик',     id: 'plannerSection',  init: renderCalendar },

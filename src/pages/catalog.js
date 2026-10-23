@@ -1,5 +1,5 @@
 // ============================================
-// КАТАЛОГ ПСИХОЛОГОВ — модуль v2
+// КАТАЛОГ ПСИХОЛОГОВ — ЕДИНЫЙ КОМПОНЕНТ
 // ============================================
 
 import { supa } from '@/lib/supabase.js';
@@ -12,6 +12,70 @@ var catalogMethod = '';
 var catalogExperience = '';
 var catalogLanguage = '';
 var catalogMaxPrice = 0;
+var isCatalogRendered = false;
+
+// ============================================
+// HTML-разметка компонента (пишется один раз)
+// ============================================
+
+function getCatalogHTML() {
+    return `
+        <div class="catalog-toolbar">
+            <div class="catalog-search">
+                <input type="text" id="catalogSearch" placeholder="Поиск по имени или специализации...">
+            </div>
+            <div class="catalog-filters">
+                <select id="filterSpecialty">
+                    <option value="">Все специализации</option>
+                    <option value="Тревога">Тревога</option>
+                    <option value="Отношения">Отношения</option>
+                    <option value="Самооценка">Самооценка</option>
+                    <option value="Депрессия">Депрессия</option>
+                    <option value="Детская психология">Детская психология</option>
+                    <option value="Семейная терапия">Семейная терапия</option>
+                </select>
+                <select id="filterMethod">
+                    <option value="">Любой метод</option>
+                    <option value="КПТ">КПТ</option>
+                    <option value="Гештальт">Гештальт</option>
+                    <option value="Психоанализ">Психоанализ</option>
+                    <option value="АСТ">АСТ</option>
+                    <option value="EMDR">EMDR</option>
+                    <option value="Семейная терапия">Семейная терапия</option>
+                    <option value="Детская психология">Детская психология</option>
+                </select>
+                <select id="filterExperience">
+                    <option value="">Любой опыт</option>
+                    <option value="none">Нет опыта</option>
+                    <option value="1-5">1–5 лет</option>
+                    <option value="6-10">6–10 лет</option>
+                    <option value="10+">Более 10 лет</option>
+                </select>
+                <select id="filterLanguage">
+                    <option value="">Любой язык</option>
+                    <option value="Русский">Русский</option>
+                    <option value="Английский">Английский</option>
+                    <option value="Немецкий">Немецкий</option>
+                    <option value="Французский">Французский</option>
+                    <option value="Испанский">Испанский</option>
+                    <option value="Китайский">Китайский</option>
+                </select>
+                <select id="filterPrice">
+                    <option value="">Любая цена</option>
+                    <option value="1500">до 1 500 ₽</option>
+                    <option value="3000">до 3 000 ₽</option>
+                    <option value="5000">до 5 000 ₽</option>
+                </select>
+            </div>
+        </div>
+        <div class="catalog-count" id="catalogCount">Найдено: 0</div>
+        <div class="catalog-list" id="catalogList"></div>
+    `;
+}
+
+// ============================================
+// Логика загрузки и фильтрации
+// ============================================
 
 function normalizePsychologist(row) {
     return {
@@ -49,13 +113,7 @@ async function fetchPsychologistsFromSupabase() {
 
 function getInitials(name) {
     if (!name) return '?';
-    if (typeof name !== 'string') name = String(name);
-    return name.split(' ')
-        .filter(function (w) { return w.length > 0; })
-        .map(function (w) { return w[0]; })
-        .slice(0, 2)
-        .join('')
-        .toUpperCase();
+    return name.split(' ').filter(function (w) { return w.length > 0; }).map(function (w) { return w[0]; }).slice(0, 2).join('').toUpperCase();
 }
 
 function escapeHtml(text) {
@@ -73,7 +131,7 @@ function matchesExperience(exp, range) {
     return true;
 }
 
-export async function renderCatalog() {
+async function renderCatalog() {
     var listEl = document.getElementById('catalogList');
     var countEl = document.getElementById('catalogCount');
     if (!listEl) return;
@@ -153,15 +211,7 @@ export async function renderCatalog() {
     });
 }
 
-var catalogBound = false;
-
-export function initCatalog() {
-    if (catalogBound) {
-        renderCatalog();
-        return;
-    }
-    catalogBound = true;
-
+function bindFilters() {
     var searchInput = document.getElementById('catalogSearch');
     if (searchInput) searchInput.addEventListener('input', function (e) { catalogSearchQuery = e.target.value.trim(); renderCatalog(); });
 
@@ -179,6 +229,21 @@ export function initCatalog() {
 
     var priceFilter = document.getElementById('filterPrice');
     if (priceFilter) priceFilter.addEventListener('change', function (e) { catalogMaxPrice = parseInt(e.target.value) || 0; renderCatalog(); });
+}
 
+// ============================================
+// Публичная инициализация
+// ============================================
+
+export function initCatalog(containerId) {
+    var container = document.getElementById(containerId);
+    if (!container) return;
+
+    if (!isCatalogRendered) {
+        container.innerHTML = getCatalogHTML();
+        bindFilters();
+        isCatalogRendered = true;
+    }
+    
     renderCatalog();
 }

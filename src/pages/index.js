@@ -1,16 +1,12 @@
-// ============================================
-// ГЛАВНАЯ — ТОЧКА ВХОДА (модуль v2)
-// ============================================
-
 import '@/styles/theme.css';
 import '@/styles/index.css';
-import '@/styles/catalog.css'; // <-- Единые стили каталога
+import '@/styles/catalog.css';
 import '@/styles/user-menu.css';
 import '@/styles/notifications.css';
 
 import { renderUserMenu } from '@/components/UserMenu.js';
 import { initNotifications } from '@/components/Notifications.js';
-import { initCatalog } from '@/pages/catalog.js'; // <-- Единая логика каталога
+import { initCatalog } from '@/pages/catalog.js';
 
 console.log('[index] loaded');
 
@@ -39,5 +35,5 @@ async function renderHeader() {
 
 document.addEventListener('DOMContentLoaded', async function () {
     await renderHeader();
-    initCatalog(); // <-- Запускает единый каталог
+    initCatalog('catalogContainer'); // <-- Передаем ID контейнера
 });
