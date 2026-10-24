@@ -1,24 +1,25 @@
 # Eupsy — Архитектура проекта
 
-**Версия:** 5.1
-**Последнее обновление:** 23 октября 2026
+**Версия:** 6.0
+**Последнее обновление:** 24 октября 2026
 
 **Проект:** Eupsy (бывшее рабочее название — PsyHelp)
-**Домен:** eupsy.ru (в процессе подключения)
+**Домен:** eupsy.ru (переезд в процессе)
 
-## 1. Структура проекта
-psy-platform/
-├── assets/
-│ ├── css/
-│ ├── js/
-│ └── images/
-├── docs/
-├── pages/
-├── index.html
-├── .gitignore
-└── README.md
-text
-
+## 1. Структура проекта (v2)
+psy-platform-v2/
+├── pages/                 ← HTML страницы (в корне)
+├── src/
+│   ├── components/        ← Единые UI-компоненты (Sidebar, Topbar, UserMenu, Notifications)
+│   ├── lib/               ← Конфиг и Supabase клиент
+│   ├── pages/             ← JS-логика страниц (модули Vite)
+│   └── styles/            ← CSS-стили (catalog.css, dashboard.css и т.д.)
+├── public/                ← Статические файлы (картинки, favicon)
+├── docs/                  ← Документация
+├── index.html             ← Главная (публичный каталог)
+├── vite.config.js         ← Конфиг сборщика
+├── package.json
+└── .gitignore
 
 ---
 
@@ -37,81 +38,58 @@ text
 | `rules-cancel.html` | публичная |
 
 **Секции `client.html`:** catalog / sessions / messages / planner / profile.
-
 **Секции `dashboard.html`:** calendar / sessions / messages / profile / reports.
 
 ---
 
-## 3. Скрипты (`assets/js/`)
+## 3. Модули (`src/`)
 
-### Подключаются везде
-
+### Компоненты (`src/components/`)
 | Файл | Что |
 |------|-----|
-| `auth-guard.js` | Проверка сессии + роли для админки |
-| `user-menu.js` | Меню аватара, переключение кабинетов |
-| `notifications.js` | Виджет уведомлений + напоминания |
+| `Sidebar.js` | Единое боковое меню (зависит от роли) |
+| `Topbar.js` | Единая верхняя шапка |
+| `UserMenu.js` | Меню аватара, переключение кабинетов |
+| `Notifications.js` | Виджет уведомлений + напоминания |
 
-### Аутентификация
-
+### Логика страниц (`src/pages/`)
 | Файл | Что |
 |------|-----|
-| `auth.js` | Регистрация |
-| `login.js` | Вход |
-
-### Кабинет клиента
-
-| Файл | Что |
-|------|-----|
-| `client.js` | Каталог + роутер секций |
-| `client-profile.js` | Профиль клиента + загрузка аватара |
-| `psychologist.js` | Профиль психолога + бронирование + отзывы |
-| `sessions.js` | Мои сессии клиента |
-| `messenger.js` | Мессенджер (Supabase) |
-| `calendar.js` | Календарь |
-| `become-block.js` | Блок заявки в профиле |
-| `become-psychologist.js` | Форма заявки + документы |
-| `application-history.js` | История заявки |
-
-### Кабинет психолога
-
-| Файл | Что |
-|------|-----|
-| `script.js` | Роутер секций дашборда |
-| `psychologist-sessions.js` | Сессии психолога |
-| `profile.js` | Личная страница психолога |
-| `reports.js` | Отчёты (в разработке) |
-
-### Админка
-
-| Файл | Что |
-|------|-----|
-| `admin.js` | Заявки, модерация, фильтры, история |
-
-### Прочее
-
-| Файл | Что |
-|------|-----|
-| `room.js` | Видеокомната (Jitsi) |
+| `index.js` | Точка входа главной. Инициализация шапки и каталога. |
+| `client.js` | Роутер секций кабинета клиента. |
+| `dashboard.js` | Роутер секций кабинета психолога. |
+| `catalog.js` | **Единый компонент каталога** (HTML + логика + фильтры). Используется и на главной, и в кабинете. |
+| `psychologist.js` | Профиль психолога (для клиента), бронирование, отзывы. |
+| `sessions.js` | Сессии клиента (отмена, комната). |
+| `psychologist-sessions.js` | Сессии психолога. |
+| `client-profile.js` | Профиль клиента. |
+| `psychologist-profile.js` | Личная страница психолога (настройки). |
+| `messenger.js` | Мессенджер (polling). |
+| `calendar.js` | Календарь (слоты, события). |
+| `become-block.js` | Блок заявки в профиле. |
+| `become-psychologist.js` | Форма заявки + документы. |
+| `application-history.js` | История заявки. |
+| `admin.js` | Админка (модерация). |
+| `room.js` | Видеокомната (Jitsi). |
+| `reports.js` | Отчёты (демо-данные). |
 
 ---
 
 ## 4. Хранилище
 
 ### Supabase
-
 **Auth:** `auth.users`
 
 **Таблицы:**
 - `profiles` — пользователи (роли, ФИО, транслируемое имя, код, статус, аватар, часовой пояс)
-- `psychologist_profiles` — психологи (специализация, стаж, цена, рейтинг, аватар)
+- `psychologist_profiles` — психологи (специализация, стаж, цена, рейтинг, аватар, method[], languages[])
 - `events` — календарь (free / session / personal / work / health / study)
 - `sessions` — бронирования
 - `reviews` — отзывы
 - `notifications` — уведомления
-- `chats` + `messages` — мессенджер (+ client_avatar, psychologist_avatar)
-- `applications` — заявки на психолога (+ documents jsonb, qualifications)
-- `application_events` — история заявки (+ author_role, snapshot jsonb)
+- `chats` + `messages` — мессенджер
+- `applications` — заявки на психолога (+ documents jsonb, qualifications, method[], languages[])
+- `application_events` — история заявки (+ snapshot jsonb)
 - `client_notes` — заметки психолога о клиенте
 
 **Storage:** `avatars` (public), `documents` (public).
@@ -127,9 +105,7 @@ text
 - `resubmit_application`
 
 ### localStorage
-
-- `psyhelp_user` — кеш профиля
-- `psyhelp_profile` — старая модель профиля психолога (можно удалить)
+- `psyhelp_user` — кеш профиля пользователя.
 
 ---
 
@@ -138,189 +114,58 @@ text
 | Роль | Что |
 |------|-----|
 | client | Каталог, сессии, чаты |
-| psychologist | Календарь, сессии |
-| moderator | Модерация (задел) |
-| admin | Управление (задел) |
-| owner | Всё |
+| psychologist | Календарь, сессии, отчёты |
+| moderator | Модерация (в разработке) |
+| admin | Управление (в разработке) |
+| owner | Всё (Админка) |
 
 `profiles.roles` — jsonb массив.
-
-**Тестовые пользователи:**
-- `test1@mail.ru` — Иван Иванович, `["client","owner","psychologist"]`
-- `anna@mail.ru` — Анна Сергеевна
 
 ---
 
 ## 6. Ключевые сценарии
 
-### Регистрация / вход
-auth.js / login.js → supa.auth → profiles → psyhelp_user
-
-### Защита страниц
-auth-guard.js → getSession → редирект при отсутствии
-
-### Слоты
-dashboard → calendar.js → events
-
 ### Бронирование
-psychologist.js → confirmBooking()
-→ 4 проверки
-→ DELETE free → INSERT sessions → INSERT events → INSERT notifications
+`catalog.js` → `psychologist.js` → confirmBooking()
+→ DELETE free → INSERT sessions → INSERT events (психологу и клиенту) → INSERT notifications
 
 ### Отмена
-sessions.js / psychologist-sessions.js → status=cancelled
+`sessions.js` / `psychologist-sessions.js` → status=cancelled
 → возврат free-слота → удаление events → уведомление
 
-### Отзывы
-psychologist.js → INSERT reviews → триггер пересчитывает рейтинг
-
 ### Заявка на психолога
-become-psychologist.js → 4 категории документов в Storage
-→ INSERT applications → триггер log_application_event → application_events (со снимком)
+`become-psychologist.js` → загрузка в Storage
+→ INSERT applications → триггер пишет в application_events
+*(Поля method и languages сохраняются в JSON и в колонки)*
 
 ### Модерация
-admin.js → RPC (approve / reject / attention)
-→ триггер пишет событие → уведомление клиенту
-
-### Повторная подача
-become-psychologist.js → resubmit_application (RPC)
-→ UPDATE applications → триггер пишет событие
-
-### История заявки
-application-history.html + application-history.js
-→ applications + application_events (раскрывающиеся снимки)
-
-### Мессенджер
-messenger.js → polling 5 сек → chats + messages → badge
-→ аватары из chats.client_avatar / psychologist_avatar
-
-### Аватары
-Загружаются в Storage/avatars
-→ клиент: profiles.avatar_url
-→ психолог: psychologist_profiles.avatar_url
-→ триггеры синхронизируют в chats.client_avatar / psychologist_avatar
-
-### Видеокомната
-room.html → Jitsi Meet → psyhelp-{sessionId}
-
-### Уведомления
-notifications.js → 30 сек polling + reminders 24ч / 1ч
-
-### Часовой пояс
-profile.js → profiles.timezone
+`admin.js` → RPC (approve / reject / attention)
+→ копирование данных в `psychologist_profiles` (включая method и languages) → отправка уведомления.
 
 ---
 
-## 7. Тема оформления
+## 7. Тема оформления и UI
 
-`theme.css` — переменные. Остальные CSS — только ссылки.
-
----
-
-## 8. Что не переведено на backend
-
-- `profile.js` — старая модель `psyhelp_profile` в localStorage не используется, но остался файл
-- `forgot.js`, `reset.js` — не работают с Supabase Auth
+- `theme.css` — переменные (цвета, шрифты).
+- `dashboard.css` — общий каркас (сайдбар, топбар, скролл).
+- `catalog.css` — **единые стили каталога** (плашка фильтров, карточки). Применяется на главной и в кабинете.
+- Шапки (`topbar`, `catalog-toolbar`) закреплены через `position: sticky` и `overflow: hidden` на обертках.
 
 ---
-## Технический долг
 
-1. **`profile.js` — старая модель `psyhelp_profile` в localStorage.** Не используется, но остался.
-2. **`demo-seed.js`** — тестовые данные, надо убрать перед запуском.
-3. **`forgot.js`, `reset.js`** — не работают с Supabase Auth.
-4. **`requests.js`, `clients.js`** — удалить (не подключены).
-5. **`settings.js`** — удалить (не подключён).
-6. **`Раздел «Отчёты» пока использует демо-данные (localStorage) до подключения платежей
+## 8. Технический долг и подготовка к коммерции
+
+1. **Хостинг (Критично):** Vercel заблокирован в РФ. Требуется переезд на Yandex Cloud / Timeweb.
+2. **Оплата:** Нет интеграции с ЮKassa (сессии сейчас бесплатные).
+3. **Видео:** Публичный Jitsi Meet (лимит 5 минут). Требуется JaaS от 8x8.
+4. **Юридические документы:** Страницы `terms.html`, `consent.html` — заглушки. Нужны для 152-ФЗ.
+5. **Почта:** Нет кастомного SMTP (только стандартные письма Supabase).
+6. **Отчёты:** Работают на демо-данных (`localStorage`).
+
+---
 
 ## 9. Документация
-
 - `state.md`
 - `architecture.md` (этот файл)
 - `theme-guide.md`
 - `changelog.md`
-
-**При старте нового чата:** `state.md` + `architecture.md` + `theme-guide.md`.
-
-Начало файла:
-markdown
-
-# Eupsy — Архитектура проекта (v2)
-
-Конец файла (последняя строка):
-markdown
-
-- `start-chat.txt`
-
-Полный текст файла 2 — вот он:
-Eupsy — Архитектура проекта (v2)
-
-Версия: 5.0
-Последнее обновление: 16 октября 2026
-1. Структура v2
-text
-
-psy-platform-v2/
-├── public/                ← HTML
-├── src/                   ← исходники
-│   ├── components/
-│   ├── lib/
-│   ├── pages/
-│   └── styles/
-├── assets/
-├── pages/
-├── docs/
-├── index.html
-├── package.json
-├── vite.config.js
-└── .gitignore
-
-2. Как работает Vite
-
-Dev: npm run dev → localhost:5173.
-Сборка: npm run build → dist/.
-Alias: @ = src/.
-3. Страницы
-Файл	Статус
-login	переведено
-register	в очереди
-client	в очереди
-dashboard	в очереди
-psychologist	в очереди
-admin	в очереди
-become-psychologist	в очереди
-application-history	в очереди
-room	в очереди
-index	в очереди
-4. Библиотеки
-Файл	Что
-supabase.js	Единый клиент
-5. Компоненты
-
-Планируется: Sidebar.js, Topbar.js, Logo.js.
-6. Хранилище
-
-Таблицы: profiles, psychologist_profiles, events, sessions, reviews, notifications, chats, messages, applications, application_events, client_notes.
-
-Storage: avatars, documents.
-7. Роли
-
-client, psychologist, moderator, admin, owner.
-8. Технический долг
-
-    Сайдбар, шапка, логотип — в компоненты.
-
-    PsyHelp → Eupsy.
-
-    Старые JS — в модули.
-
-    index.html — заменить.
-
-9. Документация
-
-    state.md
-
-    architecture.md
-
-    theme-guide.md
-
-    start-chat.txt
