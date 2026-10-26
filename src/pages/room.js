@@ -12,6 +12,7 @@ console.log('[room] loaded (Voximplant)');
 // ⚠️ ВАШИ ДАННЫЕ
 const VOXIMPLANT_ACCOUNT_ID = '11753063';
 const VOXIMPLANT_APP_NAME = 'eupsy';
+const VOXIMPLANT_NODE = 'node1'; // Если не заработает, попробуйте 'node2'
 
 // Пароли для тестовых пользователей
 const PASSWORDS = {
@@ -71,6 +72,7 @@ async function initVoximplant() {
     
     // Инициализируем SDK с указанием контейнеров для видео
     await sdk.init({
+        node: VOXIMPLANT_NODE,
         micRequired: true,
         videoSupport: true,
         videoConstraints: true,
