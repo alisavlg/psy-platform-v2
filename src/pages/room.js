@@ -12,7 +12,7 @@ console.log('[room] loaded (Voximplant)');
 // ⚠️ ВАШИ ДАННЫЕ
 const VOXIMPLANT_ACCOUNT_ID = '11753063';
 const VOXIMPLANT_APP_NAME = 'eupsy';
-const VOXIMPLANT_NODE = 'node3'; // Если не заработает, попробуйте 'node2'
+const VOXIMPLANT_NODE = 'node3'; // Ваш узел, определённый по домену n3.voximplant.com
 
 // Пароли для тестовых пользователей
 const PASSWORDS = {
@@ -70,17 +70,17 @@ function getPeerInfo(session) {
 async function initVoximplant() {
     sdk = VoxImplant.getInstance();
     
-    // init БЕЗ node
+    // Инициализируем SDK с указанием контейнеров для видео и узла
     await sdk.init({
+        node: VOXIMPLANT_NODE, // Узел передаётся в init()
         micRequired: true,
         videoSupport: true,
-        remoteVideoContainerId: 'remoteVideo',
-        localVideoContainerId: 'localVideo',
+        remoteVideoContainerId: 'remoteVideo', // Сюда SDK автоматически добавит удалённое видео
+        localVideoContainerId: 'localVideo',   // Сюда SDK автоматически добавит ваше видео
         showLocalVideo: true
     });
     
-    // node передаётся в connect
-    await sdk.connect({ node: 'node3' }); // <-- Ваш узел node3
+    await sdk.connect();
     
     const user = currentRole;
     const password = PASSWORDS[user];
@@ -91,8 +91,13 @@ async function initVoximplant() {
 
     // Обработка входящих звонков
     sdk.on(VoxImplant.Events.IncomingCall, (event) => {
+        console.log('[Voximplant] Входящий звонок от психолога');
         currentCall = event.call;
-        currentCall.answer('', {}, { sendVideo: true, receiveVideo: true });
+        
+        // Отвечаем на звонок, включая видео
+        currentCall.answer('', {}, {
+            video: { sendVideo: true, receiveVideo: true }
+        });
         setupCallEvents();
     });
 }
@@ -100,29 +105,20 @@ async function initVoximplant() {
 function setupCallEvents() {
     if (!currentCall) return;
 
-    // Событие добавления собеседника (для рендеринга видео)
-    currentCall.on(VoxImplant.CallEvents.EndpointAdded, (event) => {
-        const endpoint = event.endpoint;
-        endpoint.on(VoxImplant.EndpointEvents.RemoteMediaAdded, (mediaEvent) => {
-            const renderer = mediaEvent.mediaRenderer;
-            const remoteVideo = document.getElementById('remoteVideo');
-            if (remoteVideo && renderer) {
-                renderer.render(remoteVideo);
-            }
-        });
-    });
-
+    // Событие Connected: звонок установлен
     currentCall.on(VoxImplant.CallEvents.Connected, () => {
         console.log('[Voximplant] Звонок соединен');
         hideLoading();
         setStatus('Подключено', true);
     });
 
+    // Событие Disconnected: звонок завершён
     currentCall.on(VoxImplant.CallEvents.Disconnected, () => {
         console.log('[Voximplant] Звонок завершен');
         leaveRoom(true);
     });
 
+    // Событие Failed: ошибка
     currentCall.on(VoxImplant.CallEvents.Failed, (e) => {
         console.error('[Voximplant] Ошибка звонка:', e);
         setStatus('Ошибка соединения', false);
