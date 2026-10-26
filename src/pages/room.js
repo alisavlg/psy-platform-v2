@@ -13,8 +13,7 @@ console.log('[room] loaded (Voximplant)');
 const VOXIMPLANT_ACCOUNT_ID = '11753063';
 const VOXIMPLANT_APP_NAME = 'eupsy';
 
-// В реальном проекте пароли нельзя хранить в коде. Для теста — можно.
-// Впишите сюда пароли, которые вы задали при создании пользователей.
+// Пароли для тестовых пользователей
 const PASSWORDS = {
     client: '130972',
     psychologist: '130972'
@@ -69,10 +68,19 @@ function getPeerInfo(session) {
 
 async function initVoximplant() {
     sdk = VoxImplant.getInstance();
-    await sdk.init();
+    
+    // Инициализируем SDK с указанием контейнеров для видео
+    await sdk.init({
+        micRequired: true,
+        videoSupport: true,
+        videoConstraints: true,
+        remoteVideoContainerId: 'remoteVideo', // Сюда SDK будет выводить видео собеседника
+        localVideoContainerId: 'localVideo',   // Сюда SDK будет выводить ваше видео
+        showLocalVideo: true
+    });
+    
     await sdk.connect();
     
-    // Логинимся под нужным пользователем
     const user = currentRole;
     const password = PASSWORDS[user];
     const fullLogin = `${user}@${VOXIMPLANT_APP_NAME}.${VOXIMPLANT_ACCOUNT_ID}.voximplant.com`;
@@ -80,19 +88,33 @@ async function initVoximplant() {
     await sdk.login(fullLogin, password);
     console.log(`[Voximplant] Успешный вход как ${user}`);
 
-    // Обработка входящих звонков (для клиента)
+    // Обработка входящих звонков
     sdk.on(VoxImplant.Events.IncomingCall, (event) => {
         console.log('[Voximplant] Входящий звонок от психолога');
         currentCall = event.call;
         
-        // Автоматически отвечаем на звонок с видео
-        currentCall.answer('', {}, { sendVideo: true, receiveVideo: true });
+        // Отвечаем на звонок, включая видео
+        currentCall.answer('', {}, {
+            video: { sendVideo: true, receiveVideo: true }
+        });
         setupCallEvents();
     });
 }
 
 function setupCallEvents() {
     if (!currentCall) return;
+
+    // Событие добавления собеседника (для рендеринга видео)
+    currentCall.on(VoxImplant.CallEvents.EndpointAdded, (event) => {
+        const endpoint = event.endpoint;
+        endpoint.on(VoxImplant.EndpointEvents.RemoteMediaAdded, (mediaEvent) => {
+            const renderer = mediaEvent.mediaRenderer;
+            const remoteVideo = document.getElementById('remoteVideo');
+            if (remoteVideo && renderer) {
+                renderer.render(remoteVideo);
+            }
+        });
+    });
 
     currentCall.on(VoxImplant.CallEvents.Connected, () => {
         console.log('[Voximplant] Звонок соединен');
@@ -108,6 +130,7 @@ function setupCallEvents() {
     currentCall.on(VoxImplant.CallEvents.Failed, (e) => {
         console.error('[Voximplant] Ошибка звонка:', e);
         setStatus('Ошибка соединения', false);
+        hideLoading();
     });
 }
 
@@ -118,21 +141,22 @@ function setupCallEvents() {
 async function startCall(peerUsername) {
     console.log('[Voximplant] Звоним пользователю:', peerUsername);
 
-    const remoteVideo = document.getElementById('remoteVideo');
-    const localVideo = document.getElementById('localVideo');
-
     const callSettings = {
-        number: peerUsername, // Кому звоним
+        number: peerUsername,
         video: {
             sendVideo: true,
-            receiveVideo: true,
-            remoteVideoElement: remoteVideo,
-            localVideoElement: localVideo
+            receiveVideo: true
         }
     };
 
-    currentCall = await sdk.call(callSettings);
-    setupCallEvents();
+    try {
+        currentCall = await sdk.call(callSettings);
+        setupCallEvents();
+    } catch (err) {
+        console.error('[Voximplant] Ошибка при создании звонка:', err);
+        setStatus('Не удалось начать звонок', false);
+        hideLoading();
+    }
 }
 
 // ============================================
@@ -185,7 +209,7 @@ document.addEventListener('DOMContentLoaded', async function () {
 
     currentRole = role;
 
-    // Загружаем сессию
+    // Загружаем данные сессии
     currentSession = await loadSession(sessionId);
     if (!currentSession) {
         setStatus('Сессия не найдена', false);
