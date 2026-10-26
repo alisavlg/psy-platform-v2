@@ -5,7 +5,7 @@
 import '@/styles/theme.css';
 import '@/styles/room.css';
 import { supa } from '@/lib/supabase.js';
-import * as VoxImplant from 'voximplant-websdk';
+import * as VoxImplant from 'voximplant/websdk';
 
 console.log('[room] loaded (Voximplant)');
 
@@ -70,18 +70,17 @@ function getPeerInfo(session) {
 async function initVoximplant() {
     sdk = VoxImplant.getInstance();
     
-    // Инициализируем SDK с указанием контейнеров для видео
+    // init БЕЗ node
     await sdk.init({
-        node: VOXIMPLANT_NODE,
         micRequired: true,
         videoSupport: true,
-        videoConstraints: true,
-        remoteVideoContainerId: 'remoteVideo', // Сюда SDK будет выводить видео собеседника
-        localVideoContainerId: 'localVideo',   // Сюда SDK будет выводить ваше видео
+        remoteVideoContainerId: 'remoteVideo',
+        localVideoContainerId: 'localVideo',
         showLocalVideo: true
     });
     
-    await sdk.connect();
+    // node передаётся в connect
+    await sdk.connect({ node: 'node3' }); // <-- Ваш узел node3
     
     const user = currentRole;
     const password = PASSWORDS[user];
@@ -92,13 +91,8 @@ async function initVoximplant() {
 
     // Обработка входящих звонков
     sdk.on(VoxImplant.Events.IncomingCall, (event) => {
-        console.log('[Voximplant] Входящий звонок от психолога');
         currentCall = event.call;
-        
-        // Отвечаем на звонок, включая видео
-        currentCall.answer('', {}, {
-            video: { sendVideo: true, receiveVideo: true }
-        });
+        currentCall.answer('', {}, { sendVideo: true, receiveVideo: true });
         setupCallEvents();
     });
 }
