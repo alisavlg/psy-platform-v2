@@ -12,7 +12,7 @@ console.log('[room] loaded (Voximplant)');
 // ⚠️ ВАШИ ДАННЫЕ
 const VOXIMPLANT_ACCOUNT_ID = '11753063';
 const VOXIMPLANT_APP_NAME = 'eupsy';
-const VOXIMPLANT_NODE = 'node1'; // Если не заработает, попробуйте 'node2'
+const VOXIMPLANT_NODE = 'node3'; // Если не заработает, попробуйте 'node2'
 
 // Пароли для тестовых пользователей
 const PASSWORDS = {
