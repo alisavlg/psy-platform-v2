@@ -27,6 +27,7 @@
     "vite": "^8.3.4"
   },
   "dependencies": {
-    "@supabase/supabase-js": "^2.118.0"
+    "@supabase/supabase-js": "^2.118.0",
+    "voximplant-websdk": "^4.15.0-3039"
   }
 }

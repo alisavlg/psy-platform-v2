@@ -1,25 +1,36 @@
 // ============================================
-// КОМНАТА — Jitsi Meet + Supabase (модуль v2)
+// КОМНАТА — Voximplant (P2P видео)
 // ============================================
 
 import '@/styles/theme.css';
 import '@/styles/room.css';
 import { supa } from '@/lib/supabase.js';
+import * as VoxImplant from 'voximplant-websdk';
 
-console.log('[room] loaded');
+console.log('[room] loaded (Voximplant)');
 
-var currentSession = null;
-var currentRole = 'client';
-var jitsiApi = null;
+// ⚠️ ВАШИ ДАННЫЕ
+const VOXIMPLANT_ACCOUNT_ID = '11753063';
+const VOXIMPLANT_APP_NAME = 'eupsy';
+
+// В реальном проекте пароли нельзя хранить в коде. Для теста — можно.
+// Впишите сюда пароли, которые вы задали при создании пользователей.
+const PASSWORDS = {
+    client: '130972',
+    psychologist: '130972'
+};
+
+let sdk = null;
+let currentCall = null;
+let currentSession = null;
+let currentRole = 'client';
 
 // ============================================
 // Утилиты
 // ============================================
 
 function getMyUser() {
-    try {
-        return JSON.parse(localStorage.getItem('psyhelp_user')) || {};
-    } catch (e) { return {}; }
+    try { return JSON.parse(localStorage.getItem('psyhelp_user')) || {}; } catch (e) { return {}; }
 }
 
 function getMyDisplayName() {
@@ -35,17 +46,8 @@ function getMyDisplayName() {
     }
 }
 
-// ============================================
-// Загрузка сессии из Supabase
-// ============================================
-
 async function loadSession(sessionId) {
-    var result = await supa
-        .from('sessions')
-        .select('*')
-        .eq('id', sessionId)
-        .single();
-
+    var result = await supa.from('sessions').select('*').eq('id', sessionId).single();
     if (result.error || !result.data) {
         console.error('[room] сессия не найдена:', result.error);
         return null;
@@ -62,85 +64,80 @@ function getPeerInfo(session) {
 }
 
 // ============================================
-// Jitsi
+// Инициализация Voximplant
 // ============================================
 
-function buildRoomName(sessionId) {
-    return 'psyhelp-' + sessionId.replace(/[^a-zA-Z0-9-]/g, '');
+async function initVoximplant() {
+    sdk = VoxImplant.getInstance();
+    await sdk.init();
+    await sdk.connect();
+    
+    // Логинимся под нужным пользователем
+    const user = currentRole;
+    const password = PASSWORDS[user];
+    const fullLogin = `${user}@${VOXIMPLANT_APP_NAME}.${VOXIMPLANT_ACCOUNT_ID}.voximplant.com`;
+    
+    await sdk.login(fullLogin, password);
+    console.log(`[Voximplant] Успешный вход как ${user}`);
+
+    // Обработка входящих звонков (для клиента)
+    sdk.on(VoxImplant.Events.IncomingCall, (event) => {
+        console.log('[Voximplant] Входящий звонок от психолога');
+        currentCall = event.call;
+        
+        // Автоматически отвечаем на звонок с видео
+        currentCall.answer('', {}, { sendVideo: true, receiveVideo: true });
+        setupCallEvents();
+    });
 }
 
-function startJitsi(roomName, displayName) {
-    var container = document.getElementById('jitsiContainer');
-    if (!container) return;
+function setupCallEvents() {
+    if (!currentCall) return;
 
-    // Проверка, что Jitsi API загрузился
-    if (typeof JitsiMeetExternalAPI === 'undefined') {
-        console.error('[room] JitsiMeetExternalAPI не загружен (возможно, блокировщик рекламы)');
-        setStatus('Ошибка подключения к видео', false);
+    currentCall.on(VoxImplant.CallEvents.Connected, () => {
+        console.log('[Voximplant] Звонок соединен');
         hideLoading();
-        return;
-    }
+        setStatus('Подключено', true);
+    });
 
-    var options = {
-        roomName: roomName,
-        parentNode: container,
-        width: '100%',
-        height: '100%',
-        userInfo: { displayName: displayName },
-        configOverwrite: {
-            prejoinConfig: { enabled: false },
-            prejoinPageEnabled: false,
-            startWithAudioMuted: false,
-            startWithVideoMuted: false,
-            disableDeepLinking: true,
-            enableWelcomePage: false,
-            requireDisplayName: false,
-            toolbarButtons: [
-                'microphone', 'camera', 'desktop', 'chat',
-                'raisehand', 'tileview', 'settings', 'hangup'
-            ],
-            notifications: [],
-            disableThirdPartyRequests: true
-        },
-        interfaceConfigOverwrite: {
-            SHOW_JITSI_WATERMARK: false,
-            SHOW_WATERMARK_FOR_GUESTS: false,
-            SHOW_BRAND_WATERMARK: false,
-            SHOW_POWERED_BY: false,
-            DEFAULT_BACKGROUND: '#0f172a',
-            TOOLBAR_ALWAYS_VISIBLE: true,
-            DISABLE_JOIN_LEAVE_NOTIFICATIONS: true,
-            MOBILE_APP_PROMO: false,
-            HIDE_INVITE_MORE_HEADER: true,
-            DISABLE_VIDEO_BACKGROUND: true
+    currentCall.on(VoxImplant.CallEvents.Disconnected, () => {
+        console.log('[Voximplant] Звонок завершен');
+        leaveRoom(true);
+    });
+
+    currentCall.on(VoxImplant.CallEvents.Failed, (e) => {
+        console.error('[Voximplant] Ошибка звонка:', e);
+        setStatus('Ошибка соединения', false);
+    });
+}
+
+// ============================================
+// Совершение звонка (только для психолога)
+// ============================================
+
+async function startCall(peerUsername) {
+    console.log('[Voximplant] Звоним пользователю:', peerUsername);
+
+    const remoteVideo = document.getElementById('remoteVideo');
+    const localVideo = document.getElementById('localVideo');
+
+    const callSettings = {
+        number: peerUsername, // Кому звоним
+        video: {
+            sendVideo: true,
+            receiveVideo: true,
+            remoteVideoElement: remoteVideo,
+            localVideoElement: localVideo
         }
     };
 
-    try {
-        jitsiApi = new JitsiMeetExternalAPI('meet.jit.si', options);
-        window.__jitsi = jitsiApi;
-
-        jitsiApi.addEventListener('videoConferenceJoined', function () {
-            console.log('[room] подключение к Jitsi установлено');
-            hideLoading();
-            setStatus('Подключено', true);
-        });
-
-        jitsiApi.addEventListener('videoConferenceLeft', function () {
-            console.log('[room] выход из Jitsi');
-            leaveRoom(true);
-        });
-
-        jitsiApi.addEventListener('readyToClose', function () {
-            leaveRoom(true);
-        });
-
-    } catch (err) {
-        console.error('[room] ошибка Jitsi:', err);
-        setStatus('Ошибка подключения', false);
-        hideLoading();
-    }
+    currentCall = await sdk.call(callSettings);
+    setupCallEvents();
 }
+
+// ============================================
+// Вспомогательные функции
+// ============================================
 
 function hideLoading() {
     var el = document.getElementById('roomLoading');
@@ -157,15 +154,11 @@ function setStatus(text, connected) {
     }
 }
 
-// ============================================
-// Выход
-// ============================================
-
 function leaveRoom(silent) {
     if (!silent && !confirm('Завершить сессию?')) return;
 
     try {
-        if (jitsiApi) jitsiApi.dispose();
+        if (currentCall) currentCall.hangup();
     } catch (e) {}
 
     if (currentRole === 'psychologist') {
@@ -176,13 +169,13 @@ function leaveRoom(silent) {
 }
 
 // ============================================
-// Инициализация
+// Инициализация страницы
 // ============================================
 
 document.addEventListener('DOMContentLoaded', async function () {
-    var params = new URLSearchParams(window.location.search);
-    var sessionId = params.get('session');
-    var role = params.get('role');
+    const params = new URLSearchParams(window.location.search);
+    const sessionId = params.get('session');
+    const role = params.get('role');
 
     if (!sessionId || (role !== 'client' && role !== 'psychologist')) {
         setStatus('Не указана сессия', false);
@@ -200,7 +193,6 @@ document.addEventListener('DOMContentLoaded', async function () {
         return;
     }
 
-    // Проверка: сессия отменена?
     if (currentSession.status === 'cancelled') {
         setStatus('Сессия отменена', false);
         hideLoading();
@@ -208,10 +200,10 @@ document.addEventListener('DOMContentLoaded', async function () {
     }
 
     // Заполняем шапку
-    var peer = getPeerInfo(currentSession);
-    var peerNameEl = document.getElementById('roomPeerName');
-    var peerRoleEl = document.getElementById('roomPeerRole');
-    var myNameEl = document.getElementById('roomMyName');
+    const peer = getPeerInfo(currentSession);
+    const peerNameEl = document.getElementById('roomPeerName');
+    const peerRoleEl = document.getElementById('roomPeerRole');
+    const myNameEl = document.getElementById('roomMyName');
 
     if (peerNameEl) peerNameEl.textContent = peer.name;
     if (peerRoleEl) peerRoleEl.textContent = peer.role;
@@ -221,16 +213,21 @@ document.addEventListener('DOMContentLoaded', async function () {
 
     setStatus('Подключение...', false);
 
-    // Запускаем Jitsi
-    var roomName = buildRoomName(sessionId);
-    var displayName = getMyDisplayName();
+    // Инициализируем Voximplant
+    await initVoximplant();
 
-    console.log('[room] комната:', roomName, '| я:', displayName, '| роль:', currentRole);
-
-    startJitsi(roomName, displayName);
+    // Логика: Психолог звонит клиенту
+    if (currentRole === 'psychologist') {
+        setStatus('Звоним клиенту...', false);
+        await startCall('client');
+    } else {
+        // Клиент просто ждет входящего звонка
+        console.log('[Voximplant] Ожидание звонка от психолога...');
+        setStatus('Ожидание подключения психолога...', false);
+    }
 
     // Кнопка «Завершить»
-    var leaveBtn = document.getElementById('leaveBtn');
+    const leaveBtn = document.getElementById('leaveBtn');
     if (leaveBtn) {
         leaveBtn.addEventListener('click', function (e) {
             e.preventDefault();
