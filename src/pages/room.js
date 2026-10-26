@@ -5,7 +5,7 @@
 import '@/styles/theme.css';
 import '@/styles/room.css';
 import { supa } from '@/lib/supabase.js';
-import * as VoxImplant from 'voximplant/websdk';
+import * as VoxImplant from '@voximplant/websdk';
 
 console.log('[room] loaded (Voximplant)');
 
