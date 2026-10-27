@@ -1,20 +1,20 @@
 // ============================================
-// КОМНАТА — WebRTC (Шаг 2: Инициализация и Оффер)
+// КОМНАТА — WebRTC (Шаг 3: Полная связь)
 // ============================================
 
 import '@/styles/theme.css';
 import '@/styles/room.css';
 import { supa } from '@/lib/supabase.js';
 
-console.log('[room] loaded (WebRTC Step 2)');
+console.log('[room] loaded (WebRTC Step 3)');
 
 let currentSession = null;
 let currentRole = 'client';
 let peerConnection = null;
 let localStream = null;
-let currentChannel = null;
+let realtimeChannel = null;
 
-// Конфигурация ICE-серверов (STUN) для обхода NAT
+// Конфигурация ICE-серверов (STUN)
 const rtcConfig = {
     iceServers: [
         { urls: 'stun:stun.l.google.com:19302' },
@@ -81,7 +81,6 @@ async function initWebRTC() {
     const remoteVideo = document.getElementById('remoteVideo');
 
     try {
-        // 1. Запрашиваем камеру и микрофон
         localStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
         if (localVideo) {
             localVideo.srcObject = localStream;
@@ -93,15 +92,12 @@ async function initWebRTC() {
         return;
     }
 
-    // 2. Создаем PeerConnection
     peerConnection = new RTCPeerConnection(rtcConfig);
 
-    // 3. Добавляем локальные треки в соединение
     localStream.getTracks().forEach(track => {
         peerConnection.addTrack(track, localStream);
     });
 
-    // 4. Обработка входящего удаленного видеопотока
     peerConnection.ontrack = (event) => {
         console.log('[WebRTC] Получен удаленный поток');
         if (remoteVideo) {
@@ -110,7 +106,6 @@ async function initWebRTC() {
         }
     };
 
-    // 5. Отправка ICE-кандидатов в Supabase
     peerConnection.onicecandidate = (event) => {
         if (event.candidate) {
             sendSignal('ice-candidate', event.candidate);
@@ -118,19 +113,18 @@ async function initWebRTC() {
     };
 
     peerConnection.onconnectionstatechange = () => {
-        console.log('[WebRTC] Состояние соединения:', peerConnection.connectionState);
+        console.log('[WebRTC] Состояние:', peerConnection.connectionState);
         if (peerConnection.connectionState === 'connected') {
             hideLoading();
             setStatus('Подключено', true);
         }
     };
 
-    // 6. Если мы Психолог — создаем оффер и отправляем
+    // Если мы Психолог — создаем оффер и отправляем
     if (currentRole === 'psychologist') {
         setStatus('Создание предложения...', false);
         const offer = await peerConnection.createOffer();
         await peerConnection.setLocalDescription(offer);
-        
         await sendSignal('offer', offer);
         setStatus('Ожидание ответа клиента...', false);
     } else {
@@ -139,7 +133,7 @@ async function initWebRTC() {
 }
 
 // ============================================
-// Отправка сигналов в Supabase
+// Отправка и получение сигналов
 // ============================================
 
 async function sendSignal(type, payload) {
@@ -148,16 +142,58 @@ async function sendSignal(type, payload) {
         ? currentSession.psychologist_id 
         : currentSession.client_id;
 
-    const { error } = await supa.from('webrtc_signals').insert({
+    await supa.from('webrtc_signals').insert({
         session_id: currentSession.id,
         sender_id: myUserId,
         receiver_id: peerUserId,
         type: type,
         payload: payload
     });
+}
 
-    if (error) console.error('[WebRTC] Ошибка отправки сигнала:', error);
-    else console.log('[WebRTC] Отправлен сигнал:', type);
+// Слушаем сигналы от партнера
+function listenForSignals() {
+    const myUserId = getMyUser().id;
+
+    realtimeChannel = supa.channel('room-' + currentSession.id)
+        .on('postgres_changes', {
+            event: 'INSERT',
+            schema: 'public',
+            table: 'webrtc_signals',
+            filter: `session_id=eq.${currentSession.id}`
+        }, async (payload) => {
+            const signal = payload.new;
+            
+            // Игнорируем свои же сообщения
+            if (signal.sender_id === myUserId) return;
+
+            console.log('[WebRTC] Получен сигнал:', signal.type);
+
+            try {
+                if (signal.type === 'offer' && currentRole === 'client') {
+                    // Клиент получил оффер
+                    await peerConnection.setRemoteDescription(new RTCSessionDescription(signal.payload));
+                    const answer = await peerConnection.createAnswer();
+                    await peerConnection.setLocalDescription(answer);
+                    await sendSignal('answer', answer);
+                    setStatus('Отправка ответа...', false);
+                } 
+                else if (signal.type === 'answer' && currentRole === 'psychologist') {
+                    // Психолог получил ответ
+                    await peerConnection.setRemoteDescription(new RTCSessionDescription(signal.payload));
+                    setStatus('Установка соединения...', false);
+                } 
+                else if (signal.type === 'ice-candidate') {
+                    // Оба получают ICE-кандидатов
+                    await peerConnection.addIceCandidate(new RTCIceCandidate(signal.payload));
+                }
+            } catch (err) {
+                console.error('[WebRTC] Ошибка обработки сигнала:', err);
+            }
+        })
+        .subscribe((status) => {
+            console.log('[WebRTC] Realtime статус:', status);
+        });
 }
 
 // ============================================
@@ -191,8 +227,8 @@ document.addEventListener('DOMContentLoaded', async function () {
 
     setStatus('Подключение...', false);
 
-    // Запускаем WebRTC
     await initWebRTC();
+    listenForSignals(); // Начинаем слушать сигналы после инициализации
 
     const leaveBtn = document.getElementById('leaveBtn');
     if (leaveBtn) {
@@ -201,6 +237,7 @@ document.addEventListener('DOMContentLoaded', async function () {
             if (confirm('Завершить сессию?')) {
                 if (localStream) localStream.getTracks().forEach(t => t.stop());
                 if (peerConnection) peerConnection.close();
+                if (realtimeChannel) realtimeChannel.unsubscribe();
                 window.location.href = currentRole === 'psychologist' 
                     ? '/pages/dashboard.html?section=sessions' 
                     : '/pages/client.html?section=sessions';
