@@ -1,12 +1,12 @@
 // ============================================
-// КОМНАТА — WebRTC (Шаг 3: Полная связь)
+// КОМНАТА — WebRTC (Шаг 4: Обработка пропущенных сигналов)
 // ============================================
 
 import '@/styles/theme.css';
 import '@/styles/room.css';
 import { supa } from '@/lib/supabase.js';
 
-console.log('[room] loaded (WebRTC Step 3)');
+console.log('[room] loaded (WebRTC Step 4)');
 
 let currentSession = null;
 let currentRole = 'client';
@@ -14,17 +14,12 @@ let peerConnection = null;
 let localStream = null;
 let realtimeChannel = null;
 
-// Конфигурация ICE-серверов (STUN)
 const rtcConfig = {
     iceServers: [
         { urls: 'stun:stun.l.google.com:19302' },
         { urls: 'stun:stun1.l.google.com:19302' }
     ]
 };
-
-// ============================================
-// Утилиты
-// ============================================
 
 function getMyUser() {
     try { return JSON.parse(localStorage.getItem('psyhelp_user')) || {}; } catch (e) { return {}; }
@@ -73,7 +68,7 @@ function setStatus(text, connected) {
 }
 
 // ============================================
-// Инициализация WebRTC
+// WebRTC
 // ============================================
 
 async function initWebRTC() {
@@ -120,7 +115,6 @@ async function initWebRTC() {
         }
     };
 
-    // Если мы Психолог — создаем оффер и отправляем
     if (currentRole === 'psychologist') {
         setStatus('Создание предложения...', false);
         const offer = await peerConnection.createOffer();
@@ -133,7 +127,7 @@ async function initWebRTC() {
 }
 
 // ============================================
-// Отправка и получение сигналов
+// Отправка, получение и проверка сигналов
 // ============================================
 
 async function sendSignal(type, payload) {
@@ -151,10 +145,56 @@ async function sendSignal(type, payload) {
     });
 }
 
-// Слушаем сигналы от партнера
-function listenForSignals() {
+async function processSignal(signal) {
     const myUserId = getMyUser().id;
+    if (signal.sender_id === myUserId) return; // Игнорируем свои сообщения
 
+    console.log('[WebRTC] Обработка сигнала:', signal.type);
+
+    try {
+        if (signal.type === 'offer' && currentRole === 'client') {
+            await peerConnection.setRemoteDescription(new RTCSessionDescription(signal.payload));
+            const answer = await peerConnection.createAnswer();
+            await peerConnection.setLocalDescription(answer);
+            await sendSignal('answer', answer);
+            setStatus('Отправка ответа...', false);
+        } 
+        else if (signal.type === 'answer' && currentRole === 'psychologist') {
+            await peerConnection.setRemoteDescription(new RTCSessionDescription(signal.payload));
+            setStatus('Установка соединения...', false);
+        } 
+        else if (signal.type === 'ice-candidate') {
+            await peerConnection.addIceCandidate(new RTCIceCandidate(signal.payload));
+        }
+    } catch (err) {
+        console.error('[WebRTC] Ошибка обработки сигнала:', err);
+    }
+}
+
+async function checkExistingSignals() {
+    // При входе проверяем, нет ли уже офферов/ответов в базе
+    const myUserId = getMyUser().id;
+    const { data, error } = await supa
+        .from('webrtc_signals')
+        .select('*')
+        .eq('session_id', currentSession.id)
+        .eq('receiver_id', myUserId)
+        .order('created_at', { ascending: true });
+
+    if (error) {
+        console.error('[WebRTC] Ошибка проверки старых сигналов:', error);
+        return;
+    }
+
+    if (data && data.length > 0) {
+        console.log(`[WebRTC] Найдено ${data.length} старых сигналов. Обрабатываем...`);
+        for (const signal of data) {
+            await processSignal(signal);
+        }
+    }
+}
+
+function listenForSignals() {
     realtimeChannel = supa.channel('room-' + currentSession.id)
         .on('postgres_changes', {
             event: 'INSERT',
@@ -162,37 +202,14 @@ function listenForSignals() {
             table: 'webrtc_signals',
             filter: `session_id=eq.${currentSession.id}`
         }, async (payload) => {
-            const signal = payload.new;
-            
-            // Игнорируем свои же сообщения
-            if (signal.sender_id === myUserId) return;
-
-            console.log('[WebRTC] Получен сигнал:', signal.type);
-
-            try {
-                if (signal.type === 'offer' && currentRole === 'client') {
-                    // Клиент получил оффер
-                    await peerConnection.setRemoteDescription(new RTCSessionDescription(signal.payload));
-                    const answer = await peerConnection.createAnswer();
-                    await peerConnection.setLocalDescription(answer);
-                    await sendSignal('answer', answer);
-                    setStatus('Отправка ответа...', false);
-                } 
-                else if (signal.type === 'answer' && currentRole === 'psychologist') {
-                    // Психолог получил ответ
-                    await peerConnection.setRemoteDescription(new RTCSessionDescription(signal.payload));
-                    setStatus('Установка соединения...', false);
-                } 
-                else if (signal.type === 'ice-candidate') {
-                    // Оба получают ICE-кандидатов
-                    await peerConnection.addIceCandidate(new RTCIceCandidate(signal.payload));
-                }
-            } catch (err) {
-                console.error('[WebRTC] Ошибка обработки сигнала:', err);
-            }
+            await processSignal(payload.new);
         })
         .subscribe((status) => {
             console.log('[WebRTC] Realtime статус:', status);
+            // Когда подписка активна, проверяем, не пропустили ли мы что-то
+            if (status === 'SUBSCRIBED') {
+                checkExistingSignals();
+            }
         });
 }
 
@@ -228,7 +245,7 @@ document.addEventListener('DOMContentLoaded', async function () {
     setStatus('Подключение...', false);
 
     await initWebRTC();
-    listenForSignals(); // Начинаем слушать сигналы после инициализации
+    listenForSignals();
 
     const leaveBtn = document.getElementById('leaveBtn');
     if (leaveBtn) {
