@@ -1,29 +1,26 @@
 // ============================================
-// КОМНАТА — Voximplant v5 (официальный API)
+// КОМНАТА — WebRTC (Шаг 2: Инициализация и Оффер)
 // ============================================
 
 import '@/styles/theme.css';
 import '@/styles/room.css';
 import { supa } from '@/lib/supabase.js';
-import { Core } from '@voximplant/websdk';
-import { streamToken, StreamLoader, StreamHelper } from '@voximplant/websdk/modules/stream';
-import { callToken, CallLoader } from '@voximplant/websdk/modules/call-manager';
 
-console.log('[room] loaded (Voximplant v5 Modular)');
+console.log('[room] loaded (WebRTC Step 2)');
 
-const VOXIMPLANT_ACCOUNT_ID = '11753063';
-const VOXIMPLANT_APP_NAME = 'eupsy';
-const VOXIMPLANT_NODE = 'node3';
-
-const PASSWORDS = {
-    client: '130972',
-    psychologist: '130972'
-};
-
-let core = null;
-let currentCall = null;
 let currentSession = null;
 let currentRole = 'client';
+let peerConnection = null;
+let localStream = null;
+let currentChannel = null;
+
+// Конфигурация ICE-серверов (STUN) для обхода NAT
+const rtcConfig = {
+    iceServers: [
+        { urls: 'stun:stun.l.google.com:19302' },
+        { urls: 'stun:stun1.l.google.com:19302' }
+    ]
+};
 
 // ============================================
 // Утилиты
@@ -60,88 +57,6 @@ function getPeerInfo(session) {
     }
 }
 
-// ============================================
-// Инициализация Voximplant v5
-// ============================================
-
-async function initVoximplant() {
-    core = Core.init({
-        remoteVideoContainerId: 'remoteVideo',
-        localVideoContainerId: 'localVideo',
-        showLocalVideo: true
-    });
-
-    core.registerModules([StreamLoader(), CallLoader()]);
-
-    const { client } = core;
-    await client.connect({ node: VOXIMPLANT_NODE });
-
-    const user = currentRole;
-    const password = PASSWORDS[user];
-    const username = `${user}@${VOXIMPLANT_APP_NAME}.${VOXIMPLANT_ACCOUNT_ID}.voximplant.com`;
-
-    await client.login({ username, password });
-    console.log(`[Voximplant] Вход как ${user}`);
-
-    client.on('incomingCall', (call) => {
-        currentCall = call;
-        currentCall.answer();
-        setupCallEvents();
-    });
-}
-
-function setupCallEvents() {
-    if (!currentCall) return;
-
-    currentCall.on('connected', () => {
-        hideLoading();
-        setStatus('Подключено', true);
-    });
-
-    currentCall.on('disconnected', () => {
-        leaveRoom(true);
-    });
-
-    currentCall.on('failed', (e) => {
-        console.error('[Voximplant] Ошибка:', e);
-        setStatus('Ошибка соединения', false);
-        hideLoading();
-    });
-}
-
-// ============================================
-// Совершение звонка
-// ============================================
-
-async function startCall(peerUsername) {
-    try {
-        const callManager = core.getModule(callToken);
-        const streamModule = core.getModule(streamToken);
-
-        if (!callManager || !streamModule) {
-            throw new Error('Модули Voximplant не инициализированы');
-        }
-
-        const tracker = streamModule.createHelper(StreamHelper.DeviceTracker);
-        const call = callManager.createCall(peerUsername);
-
-        tracker.enableTracker();
-        tracker.attachCall(call);
-
-        await call.start();
-        currentCall = call;
-        setupCallEvents();
-    } catch (err) {
-        console.error('[Voximplant] Ошибка вызова:', err);
-        setStatus('Не удалось начать звонок', false);
-        hideLoading();
-    }
-}
-
-// ============================================
-// Вспомогательные функции
-// ============================================
-
 function hideLoading() {
     var el = document.getElementById('roomLoading');
     if (el) el.style.display = 'none';
@@ -157,14 +72,92 @@ function setStatus(text, connected) {
     }
 }
 
-function leaveRoom(silent) {
-    if (!silent && !confirm('Завершить сессию?')) return;
-    try { if (currentCall) currentCall.hangup(); } catch (e) {}
-    if (currentRole === 'psychologist') {
-        window.location.href = '/pages/dashboard.html?section=sessions';
-    } else {
-        window.location.href = '/pages/client.html?section=sessions';
+// ============================================
+// Инициализация WebRTC
+// ============================================
+
+async function initWebRTC() {
+    const localVideo = document.getElementById('localVideo');
+    const remoteVideo = document.getElementById('remoteVideo');
+
+    try {
+        // 1. Запрашиваем камеру и микрофон
+        localStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+        if (localVideo) {
+            localVideo.srcObject = localStream;
+            localVideo.play();
+        }
+    } catch (err) {
+        console.error('[WebRTC] Ошибка доступа к камере:', err);
+        setStatus('Нет доступа к камере', false);
+        return;
     }
+
+    // 2. Создаем PeerConnection
+    peerConnection = new RTCPeerConnection(rtcConfig);
+
+    // 3. Добавляем локальные треки в соединение
+    localStream.getTracks().forEach(track => {
+        peerConnection.addTrack(track, localStream);
+    });
+
+    // 4. Обработка входящего удаленного видеопотока
+    peerConnection.ontrack = (event) => {
+        console.log('[WebRTC] Получен удаленный поток');
+        if (remoteVideo) {
+            remoteVideo.srcObject = event.streams[0];
+            remoteVideo.play();
+        }
+    };
+
+    // 5. Отправка ICE-кандидатов в Supabase
+    peerConnection.onicecandidate = (event) => {
+        if (event.candidate) {
+            sendSignal('ice-candidate', event.candidate);
+        }
+    };
+
+    peerConnection.onconnectionstatechange = () => {
+        console.log('[WebRTC] Состояние соединения:', peerConnection.connectionState);
+        if (peerConnection.connectionState === 'connected') {
+            hideLoading();
+            setStatus('Подключено', true);
+        }
+    };
+
+    // 6. Если мы Психолог — создаем оффер и отправляем
+    if (currentRole === 'psychologist') {
+        setStatus('Создание предложения...', false);
+        const offer = await peerConnection.createOffer();
+        await peerConnection.setLocalDescription(offer);
+        
+        await sendSignal('offer', offer);
+        setStatus('Ожидание ответа клиента...', false);
+    } else {
+        setStatus('Ожидание звонка от психолога...', false);
+    }
+}
+
+// ============================================
+// Отправка сигналов в Supabase
+// ============================================
+
+async function sendSignal(type, payload) {
+    const myUserId = getMyUser().id;
+    const peerUserId = currentRole === 'client' 
+        ? currentSession.psychologist_id 
+        : currentSession.client_id;
+
+    const { error } = await supa.from('webrtc_signals').insert({
+        session_id: currentSession.id,
+        sender_id: myUserId,
+        receiver_id: peerUserId,
+        type: type,
+        payload: payload
+    });
+
+    if (error) console.error('[WebRTC] Ошибка отправки сигнала:', error);
+    else console.log('[WebRTC] Отправлен сигнал:', type);
 }
 
 // ============================================
@@ -190,12 +183,6 @@ document.addEventListener('DOMContentLoaded', async function () {
         return;
     }
 
-    if (currentSession.status === 'cancelled') {
-        setStatus('Сессия отменена', false);
-        hideLoading();
-        return;
-    }
-
     const peer = getPeerInfo(currentSession);
     document.getElementById('roomPeerName').textContent = peer.name;
     document.getElementById('roomPeerRole').textContent = peer.role;
@@ -203,20 +190,21 @@ document.addEventListener('DOMContentLoaded', async function () {
     document.title = 'Сессия с ' + peer.name + ' | Eupsy';
 
     setStatus('Подключение...', false);
-    await initVoximplant();
 
-    if (currentRole === 'psychologist') {
-        setStatus('Звоним клиенту...', false);
-        await startCall('client');
-    } else {
-        setStatus('Ожидание звонка от психолога...', false);
-    }
+    // Запускаем WebRTC
+    await initWebRTC();
 
     const leaveBtn = document.getElementById('leaveBtn');
     if (leaveBtn) {
         leaveBtn.addEventListener('click', function (e) {
             e.preventDefault();
-            leaveRoom(false);
+            if (confirm('Завершить сессию?')) {
+                if (localStream) localStream.getTracks().forEach(t => t.stop());
+                if (peerConnection) peerConnection.close();
+                window.location.href = currentRole === 'psychologist' 
+                    ? '/pages/dashboard.html?section=sessions' 
+                    : '/pages/client.html?section=sessions';
+            }
         });
     }
 });
