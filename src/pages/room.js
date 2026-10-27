@@ -1,20 +1,18 @@
 // ============================================
-// КОМНАТА — Voximplant (P2P видео)
+// КОМНАТА — Voximplant (v4, автоматический рендеринг видео)
 // ============================================
 
 import '@/styles/theme.css';
 import '@/styles/room.css';
 import { supa } from '@/lib/supabase.js';
-import * as VoxImplant from '@voximplant/websdk';
+import * as VoxImplant from 'voximplant-websdk';
 
-console.log('[room] loaded (Voximplant)');
+console.log('[room] loaded (Voximplant v4)');
 
-// ⚠️ ВАШИ ДАННЫЕ
 const VOXIMPLANT_ACCOUNT_ID = '11753063';
 const VOXIMPLANT_APP_NAME = 'eupsy';
-const VOXIMPLANT_NODE = 'node3'; // Ваш узел, определённый по домену n3.voximplant.com
+const VOXIMPLANT_NODE = 'node3';
 
-// Пароли для тестовых пользователей
 const PASSWORDS = {
     client: '130972',
     psychologist: '130972'
@@ -24,10 +22,6 @@ let sdk = null;
 let currentCall = null;
 let currentSession = null;
 let currentRole = 'client';
-
-// ============================================
-// Утилиты
-// ============================================
 
 function getMyUser() {
     try { return JSON.parse(localStorage.getItem('psyhelp_user')) || {}; } catch (e) { return {}; }
@@ -48,10 +42,7 @@ function getMyDisplayName() {
 
 async function loadSession(sessionId) {
     var result = await supa.from('sessions').select('*').eq('id', sessionId).single();
-    if (result.error || !result.data) {
-        console.error('[room] сессия не найдена:', result.error);
-        return null;
-    }
+    if (result.error || !result.data) return null;
     return result.data;
 }
 
@@ -63,41 +54,30 @@ function getPeerInfo(session) {
     }
 }
 
-// ============================================
-// Инициализация Voximplant
-// ============================================
-
 async function initVoximplant() {
     sdk = VoxImplant.getInstance();
     
-    // Инициализируем SDK с указанием контейнеров для видео и узла
+    // Указываем ID контейнеров для видео — SDK отрисует всё сам
     await sdk.init({
-        node: VOXIMPLANT_NODE, // Узел передаётся в init()
         micRequired: true,
         videoSupport: true,
-        remoteVideoContainerId: 'remoteVideo', // Сюда SDK автоматически добавит удалённое видео
-        localVideoContainerId: 'localVideo',   // Сюда SDK автоматически добавит ваше видео
+        remoteVideoContainerId: 'remoteVideo',
+        localVideoContainerId: 'localVideo',
         showLocalVideo: true
     });
     
-    await sdk.connect();
+    await sdk.connect(false); // v4: connect принимает boolean, а не объект
     
     const user = currentRole;
     const password = PASSWORDS[user];
     const fullLogin = `${user}@${VOXIMPLANT_APP_NAME}.${VOXIMPLANT_ACCOUNT_ID}.voximplant.com`;
     
     await sdk.login(fullLogin, password);
-    console.log(`[Voximplant] Успешный вход как ${user}`);
+    console.log(`[Voximplant] Вход как ${user}`);
 
-    // Обработка входящих звонков
     sdk.on(VoxImplant.Events.IncomingCall, (event) => {
-        console.log('[Voximplant] Входящий звонок от психолога');
         currentCall = event.call;
-        
-        // Отвечаем на звонок, включая видео
-        currentCall.answer('', {}, {
-            video: { sendVideo: true, receiveVideo: true }
-        });
+        currentCall.answer('', {}, { sendVideo: true, receiveVideo: true });
         setupCallEvents();
     });
 }
@@ -105,20 +85,16 @@ async function initVoximplant() {
 function setupCallEvents() {
     if (!currentCall) return;
 
-    // Событие Connected: звонок установлен
+    // Никаких ручных renderer.render() — только события статуса
     currentCall.on(VoxImplant.CallEvents.Connected, () => {
-        console.log('[Voximplant] Звонок соединен');
         hideLoading();
         setStatus('Подключено', true);
     });
 
-    // Событие Disconnected: звонок завершён
     currentCall.on(VoxImplant.CallEvents.Disconnected, () => {
-        console.log('[Voximplant] Звонок завершен');
         leaveRoom(true);
     });
 
-    // Событие Failed: ошибка
     currentCall.on(VoxImplant.CallEvents.Failed, (e) => {
         console.error('[Voximplant] Ошибка звонка:', e);
         setStatus('Ошибка соединения', false);
@@ -126,19 +102,10 @@ function setupCallEvents() {
     });
 }
 
-// ============================================
-// Совершение звонка (только для психолога)
-// ============================================
-
 async function startCall(peerUsername) {
-    console.log('[Voximplant] Звоним пользователю:', peerUsername);
-
     const callSettings = {
         number: peerUsername,
-        video: {
-            sendVideo: true,
-            receiveVideo: true
-        }
+        video: { sendVideo: true, receiveVideo: true }
     };
 
     try {
@@ -150,10 +117,6 @@ async function startCall(peerUsername) {
         hideLoading();
     }
 }
-
-// ============================================
-// Вспомогательные функции
-// ============================================
 
 function hideLoading() {
     var el = document.getElementById('roomLoading');
@@ -172,21 +135,13 @@ function setStatus(text, connected) {
 
 function leaveRoom(silent) {
     if (!silent && !confirm('Завершить сессию?')) return;
-
-    try {
-        if (currentCall) currentCall.hangup();
-    } catch (e) {}
-
+    try { if (currentCall) currentCall.hangup(); } catch (e) {}
     if (currentRole === 'psychologist') {
         window.location.href = '/pages/dashboard.html?section=sessions';
     } else {
         window.location.href = '/pages/client.html?section=sessions';
     }
 }
-
-// ============================================
-// Инициализация страницы
-// ============================================
 
 document.addEventListener('DOMContentLoaded', async function () {
     const params = new URLSearchParams(window.location.search);
@@ -200,8 +155,6 @@ document.addEventListener('DOMContentLoaded', async function () {
     }
 
     currentRole = role;
-
-    // Загружаем данные сессии
     currentSession = await loadSession(sessionId);
     if (!currentSession) {
         setStatus('Сессия не найдена', false);
@@ -215,34 +168,22 @@ document.addEventListener('DOMContentLoaded', async function () {
         return;
     }
 
-    // Заполняем шапку
     const peer = getPeerInfo(currentSession);
-    const peerNameEl = document.getElementById('roomPeerName');
-    const peerRoleEl = document.getElementById('roomPeerRole');
-    const myNameEl = document.getElementById('roomMyName');
-
-    if (peerNameEl) peerNameEl.textContent = peer.name;
-    if (peerRoleEl) peerRoleEl.textContent = peer.role;
-    if (myNameEl) myNameEl.textContent = 'Вы: ' + getMyDisplayName();
-
+    document.getElementById('roomPeerName').textContent = peer.name;
+    document.getElementById('roomPeerRole').textContent = peer.role;
+    document.getElementById('roomMyName').textContent = 'Вы: ' + getMyDisplayName();
     document.title = 'Сессия с ' + peer.name + ' | Eupsy';
 
     setStatus('Подключение...', false);
-
-    // Инициализируем Voximplant
     await initVoximplant();
 
-    // Логика: Психолог звонит клиенту
     if (currentRole === 'psychologist') {
         setStatus('Звоним клиенту...', false);
         await startCall('client');
     } else {
-        // Клиент просто ждет входящего звонка
-        console.log('[Voximplant] Ожидание звонка от психолога...');
-        setStatus('Ожидание подключения психолога...', false);
+        setStatus('Ожидание звонка от психолога...', false);
     }
 
-    // Кнопка «Завершить»
     const leaveBtn = document.getElementById('leaveBtn');
     if (leaveBtn) {
         leaveBtn.addEventListener('click', function (e) {
