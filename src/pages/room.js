@@ -1,17 +1,17 @@
 // ============================================
-// КОМНАТА — Voximplant (v4, автоматический рендеринг видео)
+// КОМНАТА — Voximplant v5 (P2P видео)
 // ============================================
 
 import '@/styles/theme.css';
 import '@/styles/room.css';
 import { supa } from '@/lib/supabase.js';
-import * as VoxImplant from 'voximplant-websdk';
+import * as VoxImplant from '@voximplant/websdk';
 
-console.log('[room] loaded (Voximplant v4)');
+console.log('[room] loaded (Voximplant v5)');
 
 const VOXIMPLANT_ACCOUNT_ID = '11753063';
 const VOXIMPLANT_APP_NAME = 'eupsy';
-const VOXIMPLANT_NODE = 'node3';
+const VOXIMPLANT_NODE = 'node3'; // Ваш узел, определён по домену n3.voximplant.com
 
 const PASSWORDS = {
     client: '130972',
@@ -54,10 +54,14 @@ function getPeerInfo(session) {
     }
 }
 
+// ============================================
+// Инициализация Voximplant v5
+// ============================================
+
 async function initVoximplant() {
     sdk = VoxImplant.getInstance();
     
-    // Указываем ID контейнеров для видео — SDK отрисует всё сам
+    // В v5 node НЕ передаётся в init
     await sdk.init({
         micRequired: true,
         videoSupport: true,
@@ -66,18 +70,19 @@ async function initVoximplant() {
         showLocalVideo: true
     });
     
-    await sdk.connect(false); // v4: connect принимает boolean, а не объект
+    // В v5 node передаётся в connect
+    await sdk.connect({ node: VOXIMPLANT_NODE });
     
     const user = currentRole;
     const password = PASSWORDS[user];
     const fullLogin = `${user}@${VOXIMPLANT_APP_NAME}.${VOXIMPLANT_ACCOUNT_ID}.voximplant.com`;
     
     await sdk.login(fullLogin, password);
-    console.log(`[Voximplant] Вход как ${user}`);
+    console.log(`[Voximplant] Успешный вход как ${user}`);
 
     sdk.on(VoxImplant.Events.IncomingCall, (event) => {
         currentCall = event.call;
-        currentCall.answer('', {}, { sendVideo: true, receiveVideo: true });
+        currentCall.answer('', {}, { video: { sendVideo: true, receiveVideo: true } });
         setupCallEvents();
     });
 }
@@ -85,7 +90,6 @@ async function initVoximplant() {
 function setupCallEvents() {
     if (!currentCall) return;
 
-    // Никаких ручных renderer.render() — только события статуса
     currentCall.on(VoxImplant.CallEvents.Connected, () => {
         hideLoading();
         setStatus('Подключено', true);
