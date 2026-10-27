@@ -1,18 +1,19 @@
 // ============================================
-// КОМНАТА — Voximplant v4 (P2P видео)
+// КОМНАТА — Voximplant v5
 // ============================================
 
 import '@/styles/theme.css';
 import '@/styles/room.css';
 import { supa } from '@/lib/supabase.js';
-import * as VoxImplant from 'voximplant-websdk';
+import * as VoxImplant from '@voximplant/websdk';
 
-console.log('[room] loaded (Voximplant v4)');
+console.log('[room] loaded (Voximplant v5)');
 
-// ⚠️ ВАШИ ДАННЫЕ
 const VOXIMPLANT_ACCOUNT_ID = '11753063';
 const VOXIMPLANT_APP_NAME = 'eupsy';
-const VOXIMPLANT_NODE = 'node3'; // Ваш узел (определён по домену n3.voximplant.com)
+
+// Точное значение из панели Voximplant
+const VOXIMPLANT_NODE = 'node3'; 
 
 const PASSWORDS = {
     client: '130972',
@@ -23,10 +24,6 @@ let sdk = null;
 let currentCall = null;
 let currentSession = null;
 let currentRole = 'client';
-
-// ============================================
-// Утилиты
-// ============================================
 
 function getMyUser() {
     try { return JSON.parse(localStorage.getItem('psyhelp_user')) || {}; } catch (e) { return {}; }
@@ -59,16 +56,12 @@ function getPeerInfo(session) {
     }
 }
 
-// ============================================
-// Инициализация Voximplant v4
-// ============================================
-
 async function initVoximplant() {
     sdk = VoxImplant.getInstance();
     
-    // 1. init: передаём node и контейнеры для видео
+    // В v5 node передается в init
     await sdk.init({
-        node: VOXIMPLANT_NODE, // В v4 node передаётся в init
+        node: VOXIMPLANT_NODE,
         micRequired: true,
         videoSupport: true,
         remoteVideoContainerId: 'remoteVideo',
@@ -76,22 +69,19 @@ async function initVoximplant() {
         showLocalVideo: true
     });
     
-    // 2. connect: в v4 принимает boolean
-    await sdk.connect(false);
+    // В v5 connect() вызывается без параметров
+    await sdk.connect();
     
-    // 3. login
     const user = currentRole;
     const password = PASSWORDS[user];
     const fullLogin = `${user}@${VOXIMPLANT_APP_NAME}.${VOXIMPLANT_ACCOUNT_ID}.voximplant.com`;
     
     await sdk.login(fullLogin, password);
-    console.log(`[Voximplant] Успешный вход как ${user}`);
+    console.log(`[Voximplant] Вход как ${user}`);
 
-    // 4. Обработка входящих звонков
     sdk.on(VoxImplant.Events.IncomingCall, (event) => {
-        console.log('[Voximplant] Входящий звонок');
         currentCall = event.call;
-        currentCall.answer('', {}, { sendVideo: true, receiveVideo: true });
+        currentCall.answer('', {}, { video: { sendVideo: true, receiveVideo: true } });
         setupCallEvents();
     });
 }
@@ -100,30 +90,22 @@ function setupCallEvents() {
     if (!currentCall) return;
 
     currentCall.on(VoxImplant.CallEvents.Connected, () => {
-        console.log('[Voximplant] Звонок соединен');
         hideLoading();
         setStatus('Подключено', true);
     });
 
     currentCall.on(VoxImplant.CallEvents.Disconnected, () => {
-        console.log('[Voximplant] Звонок завершен');
         leaveRoom(true);
     });
 
     currentCall.on(VoxImplant.CallEvents.Failed, (e) => {
-        console.error('[Voximplant] Ошибка звонка:', e);
+        console.error('[Voximplant] Ошибка:', e);
         setStatus('Ошибка соединения', false);
         hideLoading();
     });
 }
 
-// ============================================
-// Совершение звонка (только для психолога)
-// ============================================
-
 async function startCall(peerUsername) {
-    console.log('[Voximplant] Звоним пользователю:', peerUsername);
-
     const callSettings = {
         number: peerUsername,
         video: { sendVideo: true, receiveVideo: true }
@@ -133,15 +115,11 @@ async function startCall(peerUsername) {
         currentCall = await sdk.call(callSettings);
         setupCallEvents();
     } catch (err) {
-        console.error('[Voximplant] Ошибка при создании звонка:', err);
+        console.error('[Voximplant] Ошибка вызова:', err);
         setStatus('Не удалось начать звонок', false);
         hideLoading();
     }
 }
-
-// ============================================
-// Вспомогательные функции
-// ============================================
 
 function hideLoading() {
     var el = document.getElementById('roomLoading');
@@ -167,10 +145,6 @@ function leaveRoom(silent) {
         window.location.href = '/pages/client.html?section=sessions';
     }
 }
-
-// ============================================
-// Инициализация страницы
-// ============================================
 
 document.addEventListener('DOMContentLoaded', async function () {
     const params = new URLSearchParams(window.location.search);
