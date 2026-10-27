@@ -1,5 +1,5 @@
 // ============================================
-// КОМНАТА — WebRTC (Финальная версия с очередью ICE)
+// КОМНАТА — WebRTC (Финальная версия)
 // ============================================
 
 import '@/styles/theme.css';
@@ -14,9 +14,9 @@ let peerConnection = null;
 let localStream = null;
 let realtimeChannel = null;
 
-// Очередь для ICE-кандидатов, пришедших до установки remote description
 let pendingCandidates = [];
 let isRemoteDescriptionSet = false;
+let isCallInitialized = false; // Защита от повторной обработки офферов
 
 const rtcConfig = {
     iceServers: [
@@ -87,7 +87,7 @@ async function initWebRTC() {
         localStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
         if (localVideo) {
             localVideo.srcObject = localStream;
-            localVideo.play().catch(e => console.warn('[WebRTC] Ошибка play localVideo:', e));
+            localVideo.play().catch(e => console.warn('[WebRTC] play localVideo:', e));
         }
     } catch (err) {
         console.error('[WebRTC] Ошибка доступа к камере:', err);
@@ -102,10 +102,10 @@ async function initWebRTC() {
     });
 
     peerConnection.ontrack = (event) => {
-        console.log('[WebRTC] Получен удаленный поток');
         if (remoteVideo && event.streams[0]) {
             remoteVideo.srcObject = event.streams[0];
-            remoteVideo.play().catch(e => console.warn('[WebRTC] Ошибка play remoteVideo:', e));
+            // Пытаемся запустить воспроизведение
+            remoteVideo.play().catch(e => console.warn('[WebRTC] play remoteVideo:', e));
         }
     };
 
@@ -135,7 +135,7 @@ async function initWebRTC() {
 }
 
 // ============================================
-// Отправка и получение сигналов
+// Отправка и обработка сигналов
 // ============================================
 
 async function sendSignal(type, payload) {
@@ -155,14 +155,15 @@ async function sendSignal(type, payload) {
 
 async function processSignal(signal) {
     const myUserId = getMyUser().id;
-    if (signal.sender_id === myUserId) return;
-
-    console.log('[WebRTC] Обработка сигнала:', signal.type);
+    if (signal.sender_id === myUserId) return; // Игнорируем свои сообщения
 
     try {
         if (signal.type === 'offer' && currentRole === 'client') {
+            if (isCallInitialized) return; // Игнорируем повторные офферы
+            
             await peerConnection.setRemoteDescription(new RTCSessionDescription(signal.payload));
             isRemoteDescriptionSet = true;
+            isCallInitialized = true;
             await drainPendingCandidates();
 
             const answer = await peerConnection.createAnswer();
@@ -180,10 +181,13 @@ async function processSignal(signal) {
             if (isRemoteDescriptionSet) {
                 await peerConnection.addIceCandidate(new RTCIceCandidate(signal.payload));
             } else {
-                console.log('[WebRTC] Кандидат добавлен в очередь');
                 pendingCandidates.push(signal.payload);
             }
         }
+
+        // УДАЛЯЕМ ОБРАБОТАННЫЙ СИГНАЛ ИЗ БАЗЫ (чтобы не зацикливаться)
+        await supa.from('webrtc_signals').delete().eq('id', signal.id);
+
     } catch (err) {
         console.error('[WebRTC] Ошибка обработки сигнала:', err);
     }
@@ -191,7 +195,6 @@ async function processSignal(signal) {
 
 async function drainPendingCandidates() {
     if (pendingCandidates.length > 0) {
-        console.log(`[WebRTC] Применяем ${pendingCandidates.length} отложенных кандидатов`);
         for (const candidate of pendingCandidates) {
             try {
                 await peerConnection.addIceCandidate(new RTCIceCandidate(candidate));
@@ -212,10 +215,7 @@ async function checkExistingSignals() {
         .eq('receiver_id', myUserId)
         .order('created_at', { ascending: true });
 
-    if (error) {
-        console.error('[WebRTC] Ошибка проверки старых сигналов:', error);
-        return;
-    }
+    if (error) return;
 
     if (data && data.length > 0) {
         console.log(`[WebRTC] Найдено ${data.length} старых сигналов. Обрабатываем...`);
