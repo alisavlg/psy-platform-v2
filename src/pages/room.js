@@ -1,13 +1,13 @@
 // ============================================
-// КОМНАТА — Voximplant v5 (P2P видео)
+// КОМНАТА — Voximplant v4 (P2P видео)
 // ============================================
 
 import '@/styles/theme.css';
 import '@/styles/room.css';
 import { supa } from '@/lib/supabase.js';
-import * as VoxImplant from '@voximplant/websdk';
+import * as VoxImplant from 'voximplant-websdk';
 
-console.log('[room] loaded (Voximplant v5)');
+console.log('[room] loaded (Voximplant v4)');
 
 // ⚠️ ВАШИ ДАННЫЕ
 const VOXIMPLANT_ACCOUNT_ID = '11753063';
@@ -60,26 +60,26 @@ function getPeerInfo(session) {
 }
 
 // ============================================
-// Инициализация Voximplant v5
+// Инициализация Voximplant v4
 // ============================================
 
 async function initVoximplant() {
     sdk = VoxImplant.getInstance();
     
-    // 1. Инициализация с указанием узла и контейнеров для видео
+    // 1. init: передаём node и контейнеры для видео
     await sdk.init({
-        node: VOXIMPLANT_NODE, // Обязательный параметр для v5
+        node: VOXIMPLANT_NODE, // В v4 node передаётся в init
         micRequired: true,
         videoSupport: true,
-        remoteVideoContainerId: 'remoteVideo', // Сюда SDK будет добавлять удалённое видео
-        localVideoContainerId: 'localVideo',   // Сюда SDK будет добавлять ваше видео
-        showLocalVideo: true                   // Включаем отображение локального видео
+        remoteVideoContainerId: 'remoteVideo',
+        localVideoContainerId: 'localVideo',
+        showLocalVideo: true
     });
     
-    // 2. Подключение к облаку (в v5 connect() не принимает node)
-    await sdk.connect();
+    // 2. connect: в v4 принимает boolean
+    await sdk.connect(false);
     
-    // 3. Авторизация
+    // 3. login
     const user = currentRole;
     const password = PASSWORDS[user];
     const fullLogin = `${user}@${VOXIMPLANT_APP_NAME}.${VOXIMPLANT_ACCOUNT_ID}.voximplant.com`;
@@ -91,11 +91,7 @@ async function initVoximplant() {
     sdk.on(VoxImplant.Events.IncomingCall, (event) => {
         console.log('[Voximplant] Входящий звонок');
         currentCall = event.call;
-        
-        // Отвечаем на звонок с видео
-        currentCall.answer('', {}, {
-            video: { sendVideo: true, receiveVideo: true }
-        });
+        currentCall.answer('', {}, { sendVideo: true, receiveVideo: true });
         setupCallEvents();
     });
 }
@@ -103,20 +99,17 @@ async function initVoximplant() {
 function setupCallEvents() {
     if (!currentCall) return;
 
-    // Событие Connected: звонок установлен
     currentCall.on(VoxImplant.CallEvents.Connected, () => {
         console.log('[Voximplant] Звонок соединен');
         hideLoading();
         setStatus('Подключено', true);
     });
 
-    // Событие Disconnected: звонок завершён
     currentCall.on(VoxImplant.CallEvents.Disconnected, () => {
         console.log('[Voximplant] Звонок завершен');
         leaveRoom(true);
     });
 
-    // Событие Failed: ошибка
     currentCall.on(VoxImplant.CallEvents.Failed, (e) => {
         console.error('[Voximplant] Ошибка звонка:', e);
         setStatus('Ошибка соединения', false);
@@ -133,10 +126,7 @@ async function startCall(peerUsername) {
 
     const callSettings = {
         number: peerUsername,
-        video: {
-            sendVideo: true,
-            receiveVideo: true
-        }
+        video: { sendVideo: true, receiveVideo: true }
     };
 
     try {
