@@ -1,29 +1,33 @@
 // ============================================
-// КОМНАТА — Voximplant v5
+// КОМНАТА — Voximplant v5 (официальный API)
 // ============================================
 
 import '@/styles/theme.css';
 import '@/styles/room.css';
 import { supa } from '@/lib/supabase.js';
-import * as VoxImplant from '@voximplant/websdk';
+import { Core } from '@voximplant/websdk';
+import { streamToken, StreamLoader, StreamHelper } from '@voximplant/websdk/modules/stream';
+import { callToken, CallLoader } from '@voximplant/websdk/modules/call-manager';
 
-console.log('[room] loaded (Voximplant v5)');
+console.log('[room] loaded (Voximplant v5 Modular)');
 
 const VOXIMPLANT_ACCOUNT_ID = '11753063';
 const VOXIMPLANT_APP_NAME = 'eupsy';
-
-// Точное значение из панели Voximplant
-const VOXIMPLANT_NODE = 'node3'; 
+const VOXIMPLANT_NODE = 'node3';
 
 const PASSWORDS = {
     client: '130972',
     psychologist: '130972'
 };
 
-let sdk = null;
+let core = null;
 let currentCall = null;
 let currentSession = null;
 let currentRole = 'client';
+
+// ============================================
+// Утилиты
+// ============================================
 
 function getMyUser() {
     try { return JSON.parse(localStorage.getItem('psyhelp_user')) || {}; } catch (e) { return {}; }
@@ -56,32 +60,32 @@ function getPeerInfo(session) {
     }
 }
 
+// ============================================
+// Инициализация Voximplant v5
+// ============================================
+
 async function initVoximplant() {
-    sdk = VoxImplant.getInstance();
-    
-    // В v5 node передается в init
-    await sdk.init({
-        node: VOXIMPLANT_NODE,
-        micRequired: true,
-        videoSupport: true,
+    core = Core.init({
         remoteVideoContainerId: 'remoteVideo',
         localVideoContainerId: 'localVideo',
         showLocalVideo: true
     });
-    
-    // В v5 connect() вызывается без параметров
-    await sdk.connect();
-    
+
+    core.registerModules([StreamLoader(), CallLoader()]);
+
+    const { client } = core;
+    await client.connect({ node: VOXIMPLANT_NODE });
+
     const user = currentRole;
     const password = PASSWORDS[user];
-    const fullLogin = `${user}@${VOXIMPLANT_APP_NAME}.${VOXIMPLANT_ACCOUNT_ID}.voximplant.com`;
-    
-    await sdk.login(fullLogin, password);
+    const username = `${user}@${VOXIMPLANT_APP_NAME}.${VOXIMPLANT_ACCOUNT_ID}.voximplant.com`;
+
+    await client.login({ username, password });
     console.log(`[Voximplant] Вход как ${user}`);
 
-    sdk.on(VoxImplant.Events.IncomingCall, (event) => {
-        currentCall = event.call;
-        currentCall.answer('', {}, { video: { sendVideo: true, receiveVideo: true } });
+    client.on('incomingCall', (call) => {
+        currentCall = call;
+        currentCall.answer();
         setupCallEvents();
     });
 }
@@ -89,30 +93,43 @@ async function initVoximplant() {
 function setupCallEvents() {
     if (!currentCall) return;
 
-    currentCall.on(VoxImplant.CallEvents.Connected, () => {
+    currentCall.on('connected', () => {
         hideLoading();
         setStatus('Подключено', true);
     });
 
-    currentCall.on(VoxImplant.CallEvents.Disconnected, () => {
+    currentCall.on('disconnected', () => {
         leaveRoom(true);
     });
 
-    currentCall.on(VoxImplant.CallEvents.Failed, (e) => {
+    currentCall.on('failed', (e) => {
         console.error('[Voximplant] Ошибка:', e);
         setStatus('Ошибка соединения', false);
         hideLoading();
     });
 }
 
-async function startCall(peerUsername) {
-    const callSettings = {
-        number: peerUsername,
-        video: { sendVideo: true, receiveVideo: true }
-    };
+// ============================================
+// Совершение звонка
+// ============================================
 
+async function startCall(peerUsername) {
     try {
-        currentCall = await sdk.call(callSettings);
+        const callManager = core.getModule(callToken);
+        const streamModule = core.getModule(streamToken);
+
+        if (!callManager || !streamModule) {
+            throw new Error('Модули Voximplant не инициализированы');
+        }
+
+        const tracker = streamModule.createHelper(StreamHelper.DeviceTracker);
+        const call = callManager.createCall(peerUsername);
+
+        tracker.enableTracker();
+        tracker.attachCall(call);
+
+        await call.start();
+        currentCall = call;
         setupCallEvents();
     } catch (err) {
         console.error('[Voximplant] Ошибка вызова:', err);
@@ -120,6 +137,10 @@ async function startCall(peerUsername) {
         hideLoading();
     }
 }
+
+// ============================================
+// Вспомогательные функции
+// ============================================
 
 function hideLoading() {
     var el = document.getElementById('roomLoading');
@@ -145,6 +166,10 @@ function leaveRoom(silent) {
         window.location.href = '/pages/client.html?section=sessions';
     }
 }
+
+// ============================================
+// Инициализация страницы
+// ============================================
 
 document.addEventListener('DOMContentLoaded', async function () {
     const params = new URLSearchParams(window.location.search);
