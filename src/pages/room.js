@@ -1,33 +1,29 @@
 // ============================================
-// КОМНАТА — WebRTC (Финальная версия)
+// КОМНАТА — WebRTC + Polling (самый надежный способ)
 // ============================================
 
 import '@/styles/theme.css';
 import '@/styles/room.css';
 import { supa } from '@/lib/supabase.js';
 
-console.log('[room] loaded (WebRTC Final)');
+console.log('[room] loaded (WebRTC + Polling)');
 
 let currentSession = null;
 let currentRole = 'client';
 let peerConnection = null;
 let localStream = null;
-let realtimeChannel = null;
-
+let pollTimer = null;
 let pendingCandidates = [];
 let isRemoteDescriptionSet = false;
-let isCallInitialized = false; // Защита от повторной обработки офферов
+let isCallInitialized = false;
+let processedSignalIds = new Set(); // Чтобы не обрабатывать одни и те же сигналы дважды
 
+// Конфигурация TURN (ваш сервер)
 const rtcConfig = {
     iceServers: [
         { urls: 'stun:stun.l.google.com:19302' },
         { 
-            urls: 'turn:185.170.10.206:3478?transport=udp', 
-            username: 'eupsy', 
-            credential: 'EupsyVideo2026!' 
-        },
-        { 
-            urls: 'turn:185.170.10.206:3478?transport=tcp', 
+            urls: 'turn:185.170.10.206:3478', 
             username: 'eupsy', 
             credential: 'EupsyVideo2026!' 
         }
@@ -85,69 +81,7 @@ function setStatus(text, connected) {
 }
 
 // ============================================
-// WebRTC
-// ============================================
-
-async function initWebRTC() {
-    const localVideo = document.getElementById('localVideo');
-    const remoteVideo = document.getElementById('remoteVideo');
-
-    try {
-        localStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
-        if (localVideo) {
-            localVideo.srcObject = localStream;
-            localVideo.play().catch(e => console.warn('[WebRTC] play localVideo:', e));
-        }
-    } catch (err) {
-        console.error('[WebRTC] Ошибка доступа к камере:', err);
-        setStatus('Нет доступа к камере', false);
-        return;
-    }
-
-    peerConnection = new RTCPeerConnection({
-    ...rtcConfig,
-    //iceTransportPolicy: 'relay' // Принудительно используем TURN
-});
-
-    localStream.getTracks().forEach(track => {
-        peerConnection.addTrack(track, localStream);
-    });
-
-    peerConnection.ontrack = (event) => {
-        if (remoteVideo && event.streams[0]) {
-            remoteVideo.srcObject = event.streams[0];
-            // Пытаемся запустить воспроизведение
-            remoteVideo.play().catch(e => console.warn('[WebRTC] play remoteVideo:', e));
-        }
-    };
-
-    peerConnection.onicecandidate = (event) => {
-        if (event.candidate) {
-            sendSignal('ice-candidate', event.candidate);
-        }
-    };
-
-    peerConnection.onconnectionstatechange = () => {
-        console.log('[WebRTC] Состояние:', peerConnection.connectionState);
-        if (peerConnection.connectionState === 'connected') {
-            hideLoading();
-            setStatus('Подключено', true);
-        }
-    };
-
-    if (currentRole === 'psychologist') {
-        setStatus('Создание предложения...', false);
-        const offer = await peerConnection.createOffer();
-        await peerConnection.setLocalDescription(offer);
-        await sendSignal('offer', offer);
-        setStatus('Ожидание ответа клиента...', false);
-    } else {
-        setStatus('Ожидание звонка от психолога...', false);
-    }
-}
-
-// ============================================
-// Отправка и обработка сигналов
+// Отправка и получение сигналов
 // ============================================
 
 async function sendSignal(type, payload) {
@@ -167,12 +101,15 @@ async function sendSignal(type, payload) {
 
 async function processSignal(signal) {
     const myUserId = getMyUser().id;
-    if (signal.sender_id === myUserId) return; // Игнорируем свои сообщения
+    if (signal.sender_id === myUserId) return;
+    if (processedSignalIds.has(signal.id)) return; // Уже обработали
+
+    processedSignalIds.add(signal.id);
+    console.log('[WebRTC] Обработка сигнала:', signal.type);
 
     try {
         if (signal.type === 'offer' && currentRole === 'client') {
-            if (isCallInitialized) return; // Игнорируем повторные офферы
-            
+            if (isCallInitialized) return;
             await peerConnection.setRemoteDescription(new RTCSessionDescription(signal.payload));
             isRemoteDescriptionSet = true;
             isCallInitialized = true;
@@ -196,8 +133,8 @@ async function processSignal(signal) {
                 pendingCandidates.push(signal.payload);
             }
         }
-
-        // УДАЛЯЕМ ОБРАБОТАННЫЙ СИГНАЛ ИЗ БАЗЫ (чтобы не зацикливаться)
+        
+        // Удаляем обработанный сигнал, чтобы не копился мусор
         await supa.from('webrtc_signals').delete().eq('id', signal.id);
 
     } catch (err) {
@@ -208,17 +145,17 @@ async function processSignal(signal) {
 async function drainPendingCandidates() {
     if (pendingCandidates.length > 0) {
         for (const candidate of pendingCandidates) {
-            try {
-                await peerConnection.addIceCandidate(new RTCIceCandidate(candidate));
-            } catch (e) {
-                console.error('[WebRTC] Ошибка применения отложенного кандидата:', e);
-            }
+            try { await peerConnection.addIceCandidate(new RTCIceCandidate(candidate)); } catch (e) {}
         }
         pendingCandidates = [];
     }
 }
 
-async function checkExistingSignals() {
+// ============================================
+// Polling: проверяем новые сигналы каждые 2 секунды
+// ============================================
+
+async function pollSignals() {
     const myUserId = getMyUser().id;
     const { data, error } = await supa
         .from('webrtc_signals')
@@ -228,31 +165,70 @@ async function checkExistingSignals() {
         .order('created_at', { ascending: true });
 
     if (error) return;
-
     if (data && data.length > 0) {
-        console.log(`[WebRTC] Найдено ${data.length} старых сигналов. Обрабатываем...`);
         for (const signal of data) {
             await processSignal(signal);
         }
     }
 }
 
-function listenForSignals() {
-    realtimeChannel = supa.channel('room-' + currentSession.id)
-        .on('postgres_changes', {
-            event: 'INSERT',
-            schema: 'public',
-            table: 'webrtc_signals',
-            filter: `session_id=eq.${currentSession.id}`
-        }, async (payload) => {
-            await processSignal(payload.new);
-        })
-        .subscribe((status) => {
-            console.log('[WebRTC] Realtime статус:', status);
-            if (status === 'SUBSCRIBED') {
-                checkExistingSignals();
-            }
-        });
+// ============================================
+// WebRTC
+// ============================================
+
+async function initWebRTC() {
+    // Очищаем старые сигналы
+    await supa.from('webrtc_signals').delete().eq('session_id', currentSession.id);
+
+    const localVideo = document.getElementById('localVideo');
+    const remoteVideo = document.getElementById('remoteVideo');
+
+    try {
+        localStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+        if (localVideo) {
+            localVideo.srcObject = localStream;
+            localVideo.play().catch(e => console.warn(e));
+        }
+    } catch (err) {
+        console.error('[WebRTC] Ошибка камеры:', err);
+        setStatus('Нет доступа к камере', false);
+        return;
+    }
+
+    peerConnection = new RTCPeerConnection(rtcConfig);
+
+    localStream.getTracks().forEach(track => {
+        peerConnection.addTrack(track, localStream);
+    });
+
+    peerConnection.ontrack = (event) => {
+        if (remoteVideo && event.streams[0]) {
+            remoteVideo.srcObject = event.streams[0];
+            remoteVideo.play().catch(e => console.warn(e));
+        }
+    };
+
+    peerConnection.onicecandidate = (event) => {
+        if (event.candidate) sendSignal('ice-candidate', event.candidate);
+    };
+
+    peerConnection.onconnectionstatechange = () => {
+        console.log('[WebRTC] Состояние:', peerConnection.connectionState);
+        if (peerConnection.connectionState === 'connected') {
+            hideLoading();
+            setStatus('Подключено', true);
+        }
+    };
+
+    if (currentRole === 'psychologist') {
+        setStatus('Создание предложения...', false);
+        const offer = await peerConnection.createOffer();
+        await peerConnection.setLocalDescription(offer);
+        await sendSignal('offer', offer);
+        setStatus('Ожидание ответа...', false);
+    } else {
+        setStatus('Ожидание звонка...', false);
+    }
 }
 
 // ============================================
@@ -287,7 +263,10 @@ document.addEventListener('DOMContentLoaded', async function () {
     setStatus('Подключение...', false);
 
     await initWebRTC();
-    listenForSignals();
+
+    // Запускаем polling каждые 2 секунды
+    pollSignals();
+    pollTimer = setInterval(pollSignals, 2000);
 
     const leaveBtn = document.getElementById('leaveBtn');
     if (leaveBtn) {
@@ -296,7 +275,7 @@ document.addEventListener('DOMContentLoaded', async function () {
             if (confirm('Завершить сессию?')) {
                 if (localStream) localStream.getTracks().forEach(t => t.stop());
                 if (peerConnection) peerConnection.close();
-                if (realtimeChannel) realtimeChannel.unsubscribe();
+                if (pollTimer) clearInterval(pollTimer);
                 window.location.href = currentRole === 'psychologist' 
                     ? '/pages/dashboard.html?section=sessions' 
                     : '/pages/client.html?section=sessions';
