@@ -88,7 +88,7 @@ async function sendSignal(type, payload) {
     const myUserId = getMyUser().id;
     // Для клиента получатель — психолог, для психолога — клиент
     const peerUserId = currentRole === 'client' 
-        ? currentSession.psychologist_id 
+        ? currentSession.psychologist_user_id 
         : currentSession.client_id;
 
     console.log('[WebRTC] Отправка сигнала:', type, 'от', myUserId, 'кому', peerUserId);

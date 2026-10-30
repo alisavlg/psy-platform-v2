@@ -896,6 +896,7 @@ async function confirmBooking() {
             id: bookingId,
             client_id: clientUserId,
             psychologist_id: currentPsy.id,
+            psychologist_user_id: currentPsy.userId,
             psychologist_name: currentPsy.firstName + ' ' + currentPsy.middleName,
             client_code: clientCode,
             client_name: clientFullName,
