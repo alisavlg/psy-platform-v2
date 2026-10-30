@@ -105,6 +105,7 @@ async function processSignal(signal) {
     if (processedSignalIds.has(signal.id)) return; // Уже обработали
 
     processedSignalIds.add(signal.id);
+    await supa.from('webrtc_signals').delete().eq('id', signal.id);
     console.log('[WebRTC] Обработка сигнала:', signal.type);
 
     try {
