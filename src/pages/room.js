@@ -99,7 +99,10 @@ async function initWebRTC() {
         return;
     }
 
-    peerConnection = new RTCPeerConnection(rtcConfig);
+    peerConnection = new RTCPeerConnection({
+    ...rtcConfig,
+    iceTransportPolicy: 'relay' // Принудительно используем TURN
+});
 
     localStream.getTracks().forEach(track => {
         peerConnection.addTrack(track, localStream);
