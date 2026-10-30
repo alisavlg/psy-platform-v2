@@ -22,7 +22,12 @@ const rtcConfig = {
     iceServers: [
         { urls: 'stun:stun.l.google.com:19302' },
         { 
-            urls: 'turn:185.170.10.206:3478', 
+            urls: 'turn:185.170.10.206:3478?transport=udp', 
+            username: 'eupsy', 
+            credential: 'EupsyVideo2026!' 
+        },
+        { 
+            urls: 'turn:185.170.10.206:3478?transport=tcp', 
             username: 'eupsy', 
             credential: 'EupsyVideo2026!' 
         }
@@ -101,7 +106,7 @@ async function initWebRTC() {
 
     peerConnection = new RTCPeerConnection({
     ...rtcConfig,
-    iceTransportPolicy: 'relay' // Принудительно используем TURN
+    //iceTransportPolicy: 'relay' // Принудительно используем TURN
 });
 
     localStream.getTracks().forEach(track => {
