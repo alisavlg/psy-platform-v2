@@ -21,7 +21,11 @@ let isCallInitialized = false; // Защита от повторной обра�
 const rtcConfig = {
     iceServers: [
         { urls: 'stun:stun.l.google.com:19302' },
-        { urls: 'stun:stun1.l.google.com:19302' }
+        { 
+            urls: 'turn:185.170.10.206:3478', 
+            username: 'eupsy', 
+            credential: 'EupsyVideo2026!' 
+        }
     ]
 };
 
