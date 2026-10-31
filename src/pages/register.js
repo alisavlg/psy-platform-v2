@@ -184,6 +184,9 @@ document.addEventListener('DOMContentLoaded', function () {
 
         submitBtn.disabled = true;
         submitBtn.textContent = 'Отправляем...';
+                messageEl.className = 'form-message';
+        messageEl.innerHTML = '⏳ Создаем аккаунт и отправляем письмо... Пожалуйста, подождите.';
+        messageEl.style.display = 'block';
         messageEl.className = 'form-message';
         messageEl.textContent = '';
 
