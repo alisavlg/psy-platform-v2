@@ -1,24 +1,25 @@
 // ============================================
-// КОМНАТА — WebRTC + Polling (самый надежный способ)
+// КОМНАТА — WebRTC + Polling + Таймеры
 // ============================================
 
 import '@/styles/theme.css';
 import '@/styles/room.css';
 import { supa } from '@/lib/supabase.js';
 
-console.log('[room] loaded (WebRTC + Polling)');
+console.log('[room] loaded (WebRTC + Polling + Timers)');
 
 let currentSession = null;
 let currentRole = 'client';
 let peerConnection = null;
 let localStream = null;
 let pollTimer = null;
+let sessionEndTimer = null;
+let warningTimer = null;
 let pendingCandidates = [];
 let isRemoteDescriptionSet = false;
 let isCallInitialized = false;
-let processedSignalIds = new Set(); // Чтобы не обрабатывать одни и те же сигналы дважды
+let processedSignalIds = new Set();
 
-// Конфигурация TURN (ваш сервер)
 const rtcConfig = {
     iceServers: [
         { urls: 'stun:stun.l.google.com:19302' },
@@ -81,12 +82,88 @@ function setStatus(text, connected) {
 }
 
 // ============================================
+// Уведомление о скором завершении
+// ============================================
+
+function showWarning(message) {
+    var el = document.getElementById('sessionWarning');
+    if (!el) {
+        el = document.createElement('div');
+        el.id = 'sessionWarning';
+        el.style.cssText = 'position:fixed;top:70px;left:50%;transform:translateX(-50%);background:#fff3cd;color:#856404;padding:16px 24px;border-radius:12px;box-shadow:0 4px 16px rgba(0,0,0,0.15);font-size:15px;font-weight:600;z-index:999;text-align:center;';
+        document.body.appendChild(el);
+    }
+    el.textContent = message;
+    el.style.display = 'block';
+}
+
+function hideWarning() {
+    var el = document.getElementById('sessionWarning');
+    if (el) el.style.display = 'none';
+}
+
+// ============================================
+// Таймеры сессии
+// ============================================
+
+function setupSessionTimers(session) {
+    var parts = session.date.split('-');
+    var sessionStart = new Date(
+        parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]),
+        session.hour, 0, 0
+    ).getTime();
+    
+    var sessionEnd = sessionStart + 60 * 60 * 1000; // +1 час
+    var now = Date.now();
+    var msUntilEnd = sessionEnd - now;
+    var msUntilWarning = msUntilEnd - 10 * 60 * 1000;
+
+    console.log('[Timer] Сессия закончится через', Math.round(msUntilEnd / 60000), 'минут');
+
+    // Если время уже прошло — сразу завершаем
+    if (msUntilEnd <= 0) {
+        console.log('[Timer] Время сессии уже прошло. Завершаем...');
+        endSessionAutomatically();
+        return;
+    }
+
+    // Уведомление за 10 минут
+    if (msUntilWarning > 0) {
+        warningTimer = setTimeout(function() {
+            showWarning('⚠️ Сессия завершится через 10 минут');
+        }, msUntilWarning);
+    }
+
+    // Автоматическое завершение
+    sessionEndTimer = setTimeout(function() {
+        endSessionAutomatically();
+    }, msUntilEnd);
+}
+
+async function endSessionAutomatically() {
+    console.log('[Timer] Автоматическое завершение сессии');
+    showWarning('Сессия завершена. Перенаправляем в кабинет...');
+    
+    try {
+        await supa.from('sessions').update({
+            status: 'completed',
+            completed_at: new Date().toISOString()
+        }).eq('id', currentSession.id);
+    } catch (e) {
+        console.warn('[Timer] Ошибка обновления статуса:', e);
+    }
+
+    setTimeout(function() {
+        leaveRoom(true);
+    }, 2000);
+}
+
+// ============================================
 // Отправка и получение сигналов
 // ============================================
 
 async function sendSignal(type, payload) {
     const myUserId = getMyUser().id;
-    // Для клиента получатель — психолог, для психолога — клиент
     const peerUserId = currentRole === 'client' 
         ? currentSession.psychologist_user_id 
         : currentSession.client_id;
@@ -105,7 +182,7 @@ async function sendSignal(type, payload) {
 async function processSignal(signal) {
     const myUserId = getMyUser().id;
     if (signal.sender_id === myUserId) return;
-    if (processedSignalIds.has(signal.id)) return; // Уже обработали
+    if (processedSignalIds.has(signal.id)) return;
 
     processedSignalIds.add(signal.id);
     await supa.from('webrtc_signals').delete().eq('id', signal.id);
@@ -138,7 +215,6 @@ async function processSignal(signal) {
             }
         }
         
-        // Удаляем обработанный сигнал, чтобы не копился мусор
         await supa.from('webrtc_signals').delete().eq('id', signal.id);
 
     } catch (err) {
@@ -156,7 +232,7 @@ async function drainPendingCandidates() {
 }
 
 // ============================================
-// Polling: проверяем новые сигналы каждые 2 секунды
+// Polling
 // ============================================
 
 async function pollSignals() {
@@ -181,7 +257,6 @@ async function pollSignals() {
 // ============================================
 
 async function initWebRTC() {
-    // Очищаем старые сигналы
     await supa.from('webrtc_signals').delete().eq('session_id', currentSession.id);
 
     const localVideo = document.getElementById('localVideo');
@@ -205,22 +280,19 @@ async function initWebRTC() {
         peerConnection.addTrack(track, localStream);
     });
 
-    // Улучшение качества видео: явно задаём максимальный битрейт
-if (peerConnection.getSenders) {
-    var senders = peerConnection.getSenders();
-    senders.forEach(function(sender) {
-        if (sender.track && sender.track.kind === 'video') {
-            var params = sender.getParameters();
-            if (!params.encodings) {
-                params.encodings = [{}];
+    // Улучшение качества видео
+    if (peerConnection.getSenders) {
+        peerConnection.getSenders().forEach(function(sender) {
+            if (sender.track && sender.track.kind === 'video') {
+                var params = sender.getParameters();
+                if (!params.encodings) params.encodings = [{}];
+                params.encodings[0].maxBitrate = 2500000;
+                sender.setParameters(params).catch(function(e) {
+                    console.warn('[WebRTC] maxBitrate:', e);
+                });
             }
-            params.encodings[0].maxBitrate = 2500000; // 2.5 Мбит/с
-            sender.setParameters(params).catch(function(e) {
-                console.warn('[WebRTC] Не удалось установить maxBitrate:', e);
-            });
-        }
-    });
-}
+        });
+    }
 
     peerConnection.ontrack = (event) => {
         if (remoteVideo && event.streams[0]) {
@@ -241,40 +313,24 @@ if (peerConnection.getSenders) {
         }
     };
 
-    // Восстановление соединения при обрыве
-peerConnection.oniceconnectionstatechange = function() {
-    console.log('[WebRTC] ICE состояние:', peerConnection.iceConnectionState);
-    
-    if (peerConnection.iceConnectionState === 'failed') {
-        console.warn('[WebRTC] Соединение потеряно. Пробуем восстановить...');
-        setStatus('Восстановление связи...', false);
-        
-        // Перезапускаем ICE
-        peerConnection.restartIce();
-        
-        // Если мы психолог — создаём новый оффер
-        if (currentRole === 'psychologist') {
-            peerConnection.createOffer({ iceRestart: true })
-                .then(function(offer) {
-                    return peerConnection.setLocalDescription(offer);
-                })
-                .then(function() {
-                    return sendSignal('offer', peerConnection.localDescription);
-                })
-                .catch(function(err) {
-                    console.error('[WebRTC] Ошибка ICE Restart:', err);
-                });
+    peerConnection.oniceconnectionstatechange = function() {
+        console.log('[WebRTC] ICE состояние:', peerConnection.iceConnectionState);
+        if (peerConnection.iceConnectionState === 'failed') {
+            console.warn('[WebRTC] Соединение потеряно. Восстанавливаем...');
+            setStatus('Восстановление связи...', false);
+            peerConnection.restartIce();
+            if (currentRole === 'psychologist') {
+                peerConnection.createOffer({ iceRestart: true })
+                    .then(function(offer) { return peerConnection.setLocalDescription(offer); })
+                    .then(function() { return sendSignal('offer', peerConnection.localDescription); })
+                    .catch(function(err) { console.error('[WebRTC] ICE Restart:', err); });
+            }
         }
-    }
-    
-    if (peerConnection.iceConnectionState === 'connected') {
-        console.log('[WebRTC] ICE восстановлено');
-        hideLoading();
-        setStatus('Подключено', true);
-    }
-};
-
-    
+        if (peerConnection.iceConnectionState === 'connected') {
+            hideLoading();
+            setStatus('Подключено', true);
+        }
+    };
 
     if (currentRole === 'psychologist') {
         setStatus('Создание предложения...', false);
@@ -288,7 +344,28 @@ peerConnection.oniceconnectionstatechange = function() {
 }
 
 // ============================================
-// Инициализация страницы
+// Выход
+// ============================================
+
+function leaveRoom(silent) {
+    if (!silent && !confirm('Завершить сессию?')) return;
+
+    if (localStream) localStream.getTracks().forEach(t => t.stop());
+    if (peerConnection) peerConnection.close();
+    if (pollTimer) clearInterval(pollTimer);
+    if (sessionEndTimer) clearTimeout(sessionEndTimer);
+    if (warningTimer) clearTimeout(warningTimer);
+    hideWarning();
+
+    if (currentRole === 'psychologist') {
+        window.location.href = '/pages/dashboard.html?section=sessions';
+    } else {
+        window.location.href = '/pages/client.html?section=sessions';
+    }
+}
+
+// ============================================
+// Инициализация
 // ============================================
 
 document.addEventListener('DOMContentLoaded', async function () {
@@ -320,22 +397,18 @@ document.addEventListener('DOMContentLoaded', async function () {
 
     await initWebRTC();
 
-    // Запускаем polling каждые 2 секунды
+    // Запускаем polling
     pollSignals();
     pollTimer = setInterval(pollSignals, 2000);
+
+    // Запускаем таймеры сессии
+    setupSessionTimers(currentSession);
 
     const leaveBtn = document.getElementById('leaveBtn');
     if (leaveBtn) {
         leaveBtn.addEventListener('click', function (e) {
             e.preventDefault();
-            if (confirm('Завершить сессию?')) {
-                if (localStream) localStream.getTracks().forEach(t => t.stop());
-                if (peerConnection) peerConnection.close();
-                if (pollTimer) clearInterval(pollTimer);
-                window.location.href = currentRole === 'psychologist' 
-                    ? '/pages/dashboard.html?section=sessions' 
-                    : '/pages/client.html?section=sessions';
-            }
+            leaveRoom(false);
         });
     }
 });
