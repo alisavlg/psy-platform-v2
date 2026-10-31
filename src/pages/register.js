@@ -91,19 +91,6 @@ document.addEventListener('DOMContentLoaded', function () {
         return pwd.split('').sort(function () { return Math.random() - 0.5; }).join('');
     }
 
-    function generateUserCode() {
-        var letters = 'ACDEFHJKMNPRTUVWXY';
-        var digits = '23456789';
-        var code = '';
-        code += letters.charAt(Math.floor(Math.random() * letters.length));
-        code += letters.charAt(Math.floor(Math.random() * letters.length));
-        code += '-';
-        for (var i = 0; i < 4; i++) {
-            code += digits.charAt(Math.floor(Math.random() * digits.length));
-        }
-        return code;
-    }
-
     function showError(fieldId, message) {
         var errorEl = document.getElementById(fieldId + 'Error');
         var inputEl = document.getElementById(fieldId);
@@ -202,19 +189,26 @@ document.addEventListener('DOMContentLoaded', function () {
 
         var email = document.getElementById('email').value.trim();
         var password = passwordInput.value;
-        var userCode = generateUserCode();
 
-        var firstName = document.getElementById('firstName').value.trim();
-        var middleName = document.getElementById('middleName').value.trim();
-        var lastName = document.getElementById('lastName').value.trim();
-        var phone = document.getElementById('phone').value.trim();
-        var timezone = document.getElementById('timezone').value;
+        // Собираем данные формы, чтобы сохранить их и использовать после подтверждения
+        var formData = {
+            email: email,
+            firstName: document.getElementById('firstName').value.trim(),
+            middleName: document.getElementById('middleName').value.trim(),
+            lastName: document.getElementById('lastName').value.trim(),
+            phone: document.getElementById('phone').value.trim(),
+            timezone: document.getElementById('timezone').value
+        };
 
         try {
             console.log('[register] signUp...');
             var signUpResult = await supa.auth.signUp({
                 email: email,
-                password: password
+                password: password,
+                options: {
+                    // Передаем данные в метаданные пользователя, чтобы они сохранились даже без сессии
+                    data: formData
+                }
             });
 
             if (signUpResult.error) {
@@ -232,56 +226,66 @@ document.addEventListener('DOMContentLoaded', function () {
                 return;
             }
 
+            // Проверяем, требуется ли подтверждение (если сессии нет, значит, требуется)
             if (!signUpResult.data.session) {
-                messageEl.className = 'form-message error';
-                messageEl.textContent = 'Пользователь с таким email уже зарегистрирован';
-                submitBtn.disabled = false;
-                submitBtn.textContent = 'Зарегистрироваться';
-                return;
+                messageEl.className = 'form-message success';
+                messageEl.innerHTML = 
+                    '✓ Регистрация успешна!<br>' +
+                    '<span style="font-size: 14px; opacity: 0.85; line-height: 1.5; display: inline-block; margin-top: 8px;">' +
+                        'Мы отправили письмо для подтверждения на <strong>' + email + '</strong>.<br>' +
+                        'Пожалуйста, проверьте вашу почту (и обязательно папку <strong>«Спам»</strong>).<br>' +
+                        'Перейдите по ссылке из письма, чтобы активировать аккаунт.' +
+                    '</span>';
+                submitBtn.textContent = 'Ожидаем подтверждения';
+                submitBtn.disabled = true;
+                
+                form.reset();
+                return; 
             }
 
+            // Если сессия есть (например, подтверждение отключено), то идем дальше
             var userId = signUpResult.data.user.id;
-            console.log('[register] user создан:', userId);
+            console.log('[register] user создан (без подтверждения):', userId);
 
+            // Если дошли сюда, значит, подтверждение не требуется, создаем профиль сразу
+            var userCode = generateUserCode();
             console.log('[register] создаём профиль...');
             var profileResult = await supa.from('profiles').insert({
                 id: userId,
                 email: email,
                 code: userCode,
-                real_first_name: firstName,
-                real_middle_name: middleName,
-                real_last_name: lastName,
+                real_first_name: formData.firstName,
+                real_middle_name: formData.middleName,
+                real_last_name: formData.lastName,
                 display_first_name: '',
                 display_middle_name: '',
-                phone: phone,
-                timezone: timezone,
+                phone: formData.phone,
+                timezone: formData.timezone,
                 avatar_url: '',
                 psychologist_status: 'none',
                 roles: ['client']
             });
 
             if (profileResult.error) {
-                console.error('[register] profile error:', profileResult.error);
-                messageEl.className = 'form-message error';
-                messageEl.textContent = 'Аккаунт создан, но профиль не сохранился. Обратитесь в поддержку.';
-                submitBtn.disabled = false;
-                submitBtn.textContent = 'Зарегистрироваться';
-                return;
+                 console.error('[register] profile error:', profileResult.error);
+                 messageEl.className = 'form-message error';
+                 messageEl.textContent = 'Аккаунт создан, но профиль не сохранился. Обратитесь в поддержку.';
+                 submitBtn.disabled = false;
+                 submitBtn.textContent = 'Зарегистрироваться';
+                 return;
             }
-
-            console.log('[register] профиль создан');
 
             var userData = {
                 id: userId,
                 code: userCode,
                 email: email,
-                realFirstName: firstName,
-                realMiddleName: middleName,
-                realLastName: lastName,
+                realFirstName: formData.firstName,
+                realMiddleName: formData.middleName,
+                realLastName: formData.lastName,
                 displayFirstName: '',
                 displayMiddleName: '',
-                phone: phone,
-                timezone: timezone,
+                phone: formData.phone,
+                timezone: formData.timezone,
                 avatarUrl: '',
                 roles: ['client'],
                 activeRole: 'client',
@@ -293,11 +297,7 @@ document.addEventListener('DOMContentLoaded', function () {
             localStorage.setItem('psyhelp_user', JSON.stringify(userData));
 
             messageEl.className = 'form-message success';
-            messageEl.innerHTML =
-                '✓ Регистрация успешна!<br>' +
-                '<span style="font-size: 14px; opacity: 0.85;">' +
-                    'Ваш код: <strong>' + userCode + '</strong>. Сохраните его.' +
-                '</span>';
+            messageEl.innerHTML = '✓ Регистрация успешна!';
             submitBtn.textContent = 'Готово';
 
             setTimeout(function () {
