@@ -90,11 +90,19 @@ function showWarning(message) {
     if (!el) {
         el = document.createElement('div');
         el.id = 'sessionWarning';
-        el.style.cssText = 'position:fixed;top:70px;left:50%;transform:translateX(-50%);background:#fff3cd;color:#856404;padding:16px 24px;border-radius:12px;box-shadow:0 4px 16px rgba(0,0,0,0.15);font-size:15px;font-weight:600;z-index:999;text-align:center;';
+        el.style.cssText = 'position:fixed;top:70px;left:50%;transform:translateX(-50%);background:#fff3cd;color:#856404;padding:16px 24px;border-radius:12px;box-shadow:0 4px 16px rgba(0,0,0,0.15);font-size:15px;font-weight:600;z-index:999;text-align:center;transition:opacity 0.3s;';
         document.body.appendChild(el);
     }
     el.textContent = message;
     el.style.display = 'block';
+    el.style.opacity = '1';
+
+    // Автоматически скрыть через 15 секунд
+    if (el._hideTimer) clearTimeout(el._hideTimer);
+    el._hideTimer = setTimeout(function() {
+        el.style.opacity = '0';
+        setTimeout(function() { el.style.display = 'none'; }, 300);
+    }, 15000);
 }
 
 function hideWarning() {
@@ -132,6 +140,14 @@ function setupSessionTimers(session) {
         warningTimer = setTimeout(function() {
             showWarning('⚠️ Сессия завершится через 10 минут');
         }, msUntilWarning);
+    }
+
+        // Уведомление за 5 минут
+    var msUntilWarning5 = msUntilEnd - 5 * 60 * 1000;
+    if (msUntilWarning5 > 0) {
+        setTimeout(function() {
+            showWarning('⚠️ Сессия завершится через 5 минут');
+        }, msUntilWarning5);
     }
 
     // Автоматическое завершение
