@@ -205,6 +205,23 @@ async function initWebRTC() {
         peerConnection.addTrack(track, localStream);
     });
 
+    // Улучшение качества видео: явно задаём максимальный битрейт
+if (peerConnection.getSenders) {
+    var senders = peerConnection.getSenders();
+    senders.forEach(function(sender) {
+        if (sender.track && sender.track.kind === 'video') {
+            var params = sender.getParameters();
+            if (!params.encodings) {
+                params.encodings = [{}];
+            }
+            params.encodings[0].maxBitrate = 2500000; // 2.5 Мбит/с
+            sender.setParameters(params).catch(function(e) {
+                console.warn('[WebRTC] Не удалось установить maxBitrate:', e);
+            });
+        }
+    });
+}
+
     peerConnection.ontrack = (event) => {
         if (remoteVideo && event.streams[0]) {
             remoteVideo.srcObject = event.streams[0];
@@ -223,6 +240,41 @@ async function initWebRTC() {
             setStatus('Подключено', true);
         }
     };
+
+    // Восстановление соединения при обрыве
+peerConnection.oniceconnectionstatechange = function() {
+    console.log('[WebRTC] ICE состояние:', peerConnection.iceConnectionState);
+    
+    if (peerConnection.iceConnectionState === 'failed') {
+        console.warn('[WebRTC] Соединение потеряно. Пробуем восстановить...');
+        setStatus('Восстановление связи...', false);
+        
+        // Перезапускаем ICE
+        peerConnection.restartIce();
+        
+        // Если мы психолог — создаём новый оффер
+        if (currentRole === 'psychologist') {
+            peerConnection.createOffer({ iceRestart: true })
+                .then(function(offer) {
+                    return peerConnection.setLocalDescription(offer);
+                })
+                .then(function() {
+                    return sendSignal('offer', peerConnection.localDescription);
+                })
+                .catch(function(err) {
+                    console.error('[WebRTC] Ошибка ICE Restart:', err);
+                });
+        }
+    }
+    
+    if (peerConnection.iceConnectionState === 'connected') {
+        console.log('[WebRTC] ICE восстановлено');
+        hideLoading();
+        setStatus('Подключено', true);
+    }
+};
+
+    
 
     if (currentRole === 'psychologist') {
         setStatus('Создание предложения...', false);
