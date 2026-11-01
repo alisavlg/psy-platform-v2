@@ -146,7 +146,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 .from('profiles')
                 .select('*')
                 .eq('id', authUser.id)
-                .single();
+                .maybeSingle();
 
             var profile = profileResult.data;
 
