@@ -28,6 +28,7 @@ psy-platform-v2/
 - **Веб-сервер:** Nginx (раздача статики из `/var/www/eupsy/dist/`).
 - **Видеосвязь:** WebRTC + собственный TURN-сервер (Coturn) на VPS.
 - **SSL:** Let's Encrypt (Certbot).
+Почта: Postfix + OpenDKIM (собственный SMTP на VPS).
 
 ## 3. Ключевые сценарии
 
