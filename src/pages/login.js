@@ -141,23 +141,51 @@ document.addEventListener('DOMContentLoaded', function () {
             var authUser = signInResult.data.user;
             console.log('[login] авторизован:', authUser.id);
 
-            // Загружаем профиль
+                        // Загружаем профиль
             var profileResult = await supa
                 .from('profiles')
                 .select('*')
                 .eq('id', authUser.id)
                 .single();
 
-            if (profileResult.error) {
-                console.error('[login] profile error:', profileResult.error);
-                messageEl.className = 'form-message error';
-                messageEl.textContent = 'Профиль не найден. Обратитесь в поддержку.';
-                submitBtn.disabled = false;
-                submitBtn.textContent = 'Войти';
-                return;
-            }
-
             var profile = profileResult.data;
+
+            // Если профиля нет (пользователь только что подтвердил почту), создаем его
+            if (profileResult.error || !profile) {
+                console.log('[login] профиля нет, создаем из метаданных...');
+                
+                var meta = authUser.user_metadata || {};
+                // Генерируем случайный код пользователя
+                var randomCode = 'U-' + Math.floor(1000 + Math.random() * 9000);
+
+                var insertResult = await supa.from('profiles').insert({
+                    id: authUser.id,
+                    email: authUser.email,
+                    code: randomCode,
+                    real_first_name: meta.firstName || '',
+                    real_middle_name: meta.middleName || '',
+                    real_last_name: meta.lastName || '',
+                    display_first_name: '',
+                    display_middle_name: '',
+                    phone: meta.phone || '',
+                    timezone: meta.timezone || 'Europe/Moscow',
+                    avatar_url: '',
+                    psychologist_status: 'none',
+                    roles: ['client']
+                }).select().single();
+
+                if (insertResult.error) {
+                    console.error('[login] profile insert error:', insertResult.error);
+                    messageEl.className = 'form-message error';
+                    messageEl.textContent = 'Ошибка создания профиля: ' + insertResult.error.message;
+                    submitBtn.disabled = false;
+                    submitBtn.textContent = 'Войти';
+                    return;
+                }
+
+                profile = insertResult.data;
+                console.log('[login] профиль успешно создан:', profile);
+            }
 
             // Собираем psyhelp_user для совместимости с остальными скриптами
             var userData = {
