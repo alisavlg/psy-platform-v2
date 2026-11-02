@@ -15,12 +15,16 @@ import { renderTopbar } from '@/components/Topbar.js';
 import { renderUserMenu } from '@/components/UserMenu.js';
 import { initNotifications } from '@/components/Notifications.js';
 
+// Импортируем модуль сводки
+import { initDashboardStats } from '@/pages/dashboard-stats.js';
+
 console.log('[admin] loaded');
 
-// Секции (пока только Сводка, Заявки добавим позже)
+// Секции
 var SECTIONS = {
-    dashboard: { title: 'Сводка', id: 'dashboardSection', init: null },
-    applications: { title: 'Заявки', id: 'applicationsSection', init: null }
+    dashboard: { title: 'Сводка', id: 'dashboardSection', init: initDashboardStats },
+    applications: { title: 'Заявки', id: 'applicationsSection', init: null },
+    users: { title: 'Пользователи', id: 'usersSection', init: null }
 };
 
 function getSectionFromURL() {
@@ -56,7 +60,6 @@ async function renderAdminSection() {
 document.addEventListener('DOMContentLoaded', async function () {
     window.CURRENT_USER = 'owner';
     
-    // Строгая проверка ролей
     var user = JSON.parse(localStorage.getItem('psyhelp_user') || '{}');
     var roles = Array.isArray(user.roles) ? user.roles : [];
     if (!user.id || (roles.indexOf('owner') === -1 && roles.indexOf('admin') === -1)) {
