@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Модерация | Eupsy</title>
+    <title>Админка | Eupsy</title>
 </head>
 <body>
     <div class="dashboard-layout">
@@ -13,8 +13,17 @@
             <header class="topbar" id="appTopbar"></header>
 
             <div class="content-row">
-                <main class="main-content" id="mainContent">
-                    <!-- Содержимое рисует JS -->
+                <main class="main-content">
+                    <!-- СВОДКА -->
+                    <div id="dashboardSection">
+                        <h2>Добро пожаловать в CRM!</h2>
+                        <p>Здесь будет статистика.</p>
+                    </div>
+
+                    <!-- ЗАЯВКИ -->
+                    <div id="applicationsSection" style="display:none;">
+                        <p>Здесь будут заявки.</p>
+                    </div>
                 </main>
             </div>
         </div>
