@@ -10,31 +10,36 @@ export async function initDashboardStats() {
     var container = document.getElementById('dashboardSection');
     if (!container) return;
 
-    // Показываем загрузку
     container.innerHTML = '<div style="padding:20px;text-align:center;color:#888;">Загрузка статистики...</div>';
 
     try {
-        // 1. Считаем клиентов (роль client)
-        var clientsRes = await supa.from('profiles').select('*', { count: 'exact', head: true }).contains('roles', ['client']);
-        
-        // 2. Считаем психологов (роль psychologist)
-        var psyRes = await supa.from('profiles').select('*', { count: 'exact', head: true }).contains('roles', ['psychologist']);
-        
-        // 3. Считаем общее количество сессий
-        var sessionsRes = await supa.from('sessions').select('*', { count: 'exact', head: true });
+        // 1. Получаем всех пользователей и фильтруем вручную (чтобы обойти ограничения count)
+        var profilesRes = await supa.from('profiles').select('id, roles');
+        var allProfiles = profilesRes.data || [];
 
-        // 4. Считаем сумму всех проведенных сессий (status = 'completed')
-        var completedRes = await supa.from('sessions').select('price').eq('status', 'completed');
+        var clientsCount = 0;
+        var psyCount = 0;
+
+        allProfiles.forEach(function (p) {
+            var roles = Array.isArray(p.roles) ? p.roles : [];
+            if (roles.indexOf('client') !== -1) clientsCount++;
+            if (roles.indexOf('psychologist') !== -1) psyCount++;
+        });
+
+        // 2. Считаем сессии
+        var sessionsRes = await supa.from('sessions').select('id, price, status');
+        var allSessions = sessionsRes.data || [];
+        var sessionsCount = allSessions.length;
+
+        // 3. Считаем сумму завершенных
         var totalRevenue = 0;
-        if (completedRes.data) {
-            totalRevenue = completedRes.data.reduce(function (sum, s) { return sum + (s.price || 0); }, 0);
-        }
+        allSessions.forEach(function (s) {
+            if (s.status === 'completed') {
+                totalRevenue += (s.price || 0);
+            }
+        });
 
-        var clientsCount = clientsRes.count || 0;
-        var psyCount = psyRes.count || 0;
-        var sessionsCount = sessionsRes.count || 0;
-
-        // Рисуем карточки
+        // Рисуем
         container.innerHTML = 
             '<div class="stats-grid" style="display:grid;grid-template-columns:repeat(auto-fit, minmax(200px, 1fr));gap:20px;margin-top:20px;">' +
                 
@@ -72,6 +77,6 @@ export async function initDashboardStats() {
 
     } catch (err) {
         console.error('[dashboard-stats] error:', err);
-        container.innerHTML = '<div style="color:red;padding:20px;">Ошибка загрузки статистики.</div>';
+        container.innerHTML = '<div style="color:red;padding:20px;">Ошибка загрузки: ' + err.message + '</div>';
     }
 }
