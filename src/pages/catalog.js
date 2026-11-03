@@ -109,6 +109,11 @@ async function fetchPsychologistsFromSupabase() {
         console.error('[catalog] исключение при загрузке:', err);
         return [];
     }
+    // Не показываем Поддержку в каталоге
+    var validData = (result.data || []).filter(function(p) { 
+        return p.id !== '00000000-0000-0000-0000-000000000000'; 
+    });
+        return validData.map(normalizePsychologist);
 }
 
 function getInitials(name) {

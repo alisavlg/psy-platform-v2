@@ -50,7 +50,7 @@ function getSectionFromURL() {
 // Проверка доступа
 // ============================================
 
-function checkAccess() {
+async function checkAccess() {
     var raw = localStorage.getItem('psyhelp_user');
     if (!raw) {
         window.location.href = '/pages/login.html';
@@ -58,11 +58,33 @@ function checkAccess() {
     }
     try {
         var user = JSON.parse(raw);
-        var roles = Array.isArray(user.roles) ? user.roles : [];
-        if (roles.indexOf('psychologist') === -1) {
+        if (!user.id) {
+            window.location.href = '/pages/login.html';
+            return false;
+        }
+
+        // Запрашиваем актуальные данные из БД
+        var res = await supa.from('profiles').select('roles').eq('id', user.id).single();
+        if (res.error || !res.data) {
+            window.location.href = '/pages/login.html';
+            return false;
+        }
+
+        var actualRoles = Array.isArray(res.data.roles) ? res.data.roles : [];
+        if (actualRoles.indexOf('psychologist') === -1) {
+            // Роль удалена — обновляем localStorage и выкидываем
+            user.roles = actualRoles;
+            localStorage.setItem('psyhelp_user', JSON.stringify(user));
             window.location.href = '/pages/client.html?section=catalog';
             return false;
         }
+        
+        // Если роль есть — обновляем кеш на всякий случай
+        if (user.roles.length !== actualRoles.length) {
+            user.roles = actualRoles;
+            localStorage.setItem('psyhelp_user', JSON.stringify(user));
+        }
+
     } catch (e) {
         window.location.href = '/pages/login.html';
         return false;
@@ -106,7 +128,7 @@ async function renderDashboardSection() {
 document.addEventListener('DOMContentLoaded', async function () {
     window.CURRENT_USER = 'psychologist';
 
-    if (!checkAccess()) return;
+    if (!(await checkAccess())) return;
 
     var section = getSectionFromURL();
     var sectionConf = SECTIONS[section] || SECTIONS.calendar;
