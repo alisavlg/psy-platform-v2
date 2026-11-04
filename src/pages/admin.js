@@ -9,19 +9,22 @@ import '@/styles/notifications.css';
 import '@/styles/admin.css';
 import '@/styles/messenger.css';
 import '@/styles/profile-client.css';
-import { initClientProfile } from '@/pages/client-profile.js';
+import '@/styles/calendar.css';
+
 import { supa } from '@/lib/supabase.js';
 import { renderSidebar } from '@/components/Sidebar.js';
 import { renderTopbar } from '@/components/Topbar.js';
 import { renderUserMenu } from '@/components/UserMenu.js';
-import { initNotifications, Notifications } from '@/components/Notifications.js';
+import { initNotifications } from '@/components/Notifications.js';
 import { initDashboardStats } from '@/pages/dashboard-stats.js';
-import { renderMessenger } from '@/pages/messenger.js'; // Единый мессенджер
+import { renderMessenger } from '@/pages/messenger.js';
+import { renderCalendar } from '@/pages/calendar.js';
+import { initClientProfile } from '@/pages/client-profile.js';
 
 console.log('[admin] loaded');
 
 // ============================================
-// 1. ЗАЯВКИ (заглушка)
+// ЗАЯВКИ (заглушка)
 // ============================================
 async function reloadApplications() {
     var listEl = document.getElementById('applicationsSection');
@@ -30,7 +33,7 @@ async function reloadApplications() {
 }
 
 // ============================================
-// 2. ПОЛЬЗОВАТЕЛИ (заглушка)
+// ПОЛЬЗОВАТЕЛИ (заглушка)
 // ============================================
 async function renderUsers() {
     var container = document.getElementById('usersSection');
@@ -39,23 +42,23 @@ async function renderUsers() {
 }
 
 // ============================================
-// 3. СЕКЦИИ И РОУТЕР
+// СЕКЦИИ И РОУТЕР
 // ============================================
 var SECTIONS = {
     dashboard: { title: 'Сводка', id: 'dashboardSection', init: initDashboardStats },
     applications: { title: 'Заявки', id: 'applicationsSection', init: reloadApplications },
-    messages: { title: 'Сообщения', id: 'messagesSection', init: renderMessenger },
+    
+    // Поддержка клиентов (старый пункт)
+    messages: { title: 'Поддержка клиентов', id: 'supportChatsSection', init: function() { window.CURRENT_USER = 'support'; renderMessenger('support'); } },
+    
+    // Поддержка психологов (новый пункт)
+    support_psy: { title: 'Поддержка психологов', id: 'supportPsyChatsSection', init: function() { window.CURRENT_USER = 'support'; renderMessenger('support_psy'); } },
+    
+    chat_admin: { title: 'Мои сообщения', id: 'adminChatsSection', init: function() { window.CURRENT_USER = 'admin'; renderMessenger('admin'); } },
     users: { title: 'Пользователи', id: 'usersSection', init: renderUsers },
-    // Аудит использует тот же мессенджер, но покажет все чаты (благодаря логике внутри messenger.js)
-    audit: { title: 'Аудит платформы', id: 'messagesSection', init: renderMessenger },
-    // Заглушки
-    sales: { title: 'CRM / Продажи', id: 'dashboardSection', init: function() { document.getElementById('dashboardSection').innerHTML = 'Раздел продаж в разработке'; } },
-    reports: { title: 'Бухгалтерия', id: 'dashboardSection', init: function() { document.getElementById('dashboardSection').innerHTML = 'Раздел финансов в разработке'; } },
-    marketing: { title: 'Маркетинг', id: 'dashboardSection', init: function() { document.getElementById('dashboardSection').innerHTML = 'Раздел маркетинга в разработке'; } },
-    tech: { title: 'Техподдержка', id: 'dashboardSection', init: function() { document.getElementById('dashboardSection').innerHTML = 'Раздел техподдержки в разработке'; } },
     profile: { title: 'Профиль', id: 'profileSection', init: initClientProfile },
+    planner: { title: 'Планировщик', id: 'calendarSection', init: renderCalendar }
 };
-
 function getSectionFromURL() {
     var params = new URLSearchParams(window.location.search);
     return params.get('section') || 'dashboard';
@@ -75,10 +78,8 @@ async function renderAdminSection() {
     if (window.CURRENT_USER === 'support') currentRole = 'support';
     if (window.CURRENT_USER === 'compliance') currentRole = 'compliance';
 
-    // Рисуем меню (в зависимости от роли)
     renderSidebar(currentRole, sectionKey);
 
-    // Переключаем видимость секций
     Object.keys(SECTIONS).forEach(function (key) {
         var el = document.getElementById(SECTIONS[key].id);
         if (el) el.style.display = (key === sectionKey) ? 'block' : 'none';

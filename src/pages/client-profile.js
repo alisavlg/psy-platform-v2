@@ -1,5 +1,5 @@
 // ============================================
-// ПРОФИЛЬ КЛИЕНТА (и Поддержки) — модуль v2
+// ПРОФИЛЬ (Единый для всех ролей) — модуль v2
 // ============================================
 
 import { supa } from '@/lib/supabase.js';
@@ -109,7 +109,107 @@ function getDisplayName(user) {
 
 export function renderClientProfile() {
     var user = getClientUser();
+    var currentRole = window.CURRENT_USER || 'client';
 
+    // --- 1. СОЗДАЕМ РАЗМЕТКУ, ЕСЛИ ЕЕ НЕТ (для админки) ---
+    var container = document.getElementById('profileSection');
+    if (container && container.innerHTML.trim() === '') {
+        container.innerHTML = `
+            <div class="profile-edit-container">
+                <div class="profile-fio-block">
+                    <div class="profile-fio-header">
+                        <h3>Персональные данные</h3>
+                        <span class="verify-badge" id="clientVerifyBadge">👤 Клиент</span>
+                    </div>
+                    <div class="profile-fio-row">
+                        <div class="profile-fio-item"><span class="profile-fio-label">Имя</span><span class="profile-fio-value" id="clientRealFirstName">—</span></div>
+                        <div class="profile-fio-item"><span class="profile-fio-label">Отчество</span><span class="profile-fio-value" id="clientRealMiddleName">—</span></div>
+                    </div>
+                    <div class="profile-fio-row">
+                        <div class="profile-fio-item full"><span class="profile-fio-label">Фамилия</span><span class="profile-fio-value" id="clientRealLastName">—</span></div>
+                    </div>
+                </div>
+
+                <div class="profile-display-block">
+                    <div class="profile-display-header"><h3>Как вас видят другие</h3></div>
+                    <div class="profile-display-preview">
+                        <div class="profile-display-avatar" id="clientAvatarPreview">Фото</div>
+                        <div class="profile-display-info">
+                            <div class="profile-display-name" id="displayNamePreview">—</div>
+                            <div class="profile-display-role">Клиент</div>
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group" id="displayFirstNameGroup"><label for="displayFirstName">Имя (транслируемое)</label><input type="text" id="displayFirstName" placeholder="Например, Ирина"></div>
+                        <div class="form-group" id="displayMiddleNameGroup"><label for="displayMiddleName">Отчество (транслируемое)</label><input type="text" id="displayMiddleName" placeholder="Например, Викторовна"></div>
+                    </div>
+                    <div class="profile-avatar-actions">
+                        <input type="file" id="clientAvatarInput" accept="image/*" style="display:none;">
+                        <button type="button" class="btn-photo" id="clientAvatarBtn">Загрузить фото</button>
+                    </div>
+                </div>
+
+                <div class="profile-code-block">
+                    <div class="profile-code-label">Ваш код на платформе</div>
+                    <div class="profile-code-row">
+                        <span class="profile-code-value" id="clientUserCode">—</span>
+                        <button type="button" class="btn-copy-code" id="copyCodeBtn">📋 Скопировать</button>
+                    </div>
+                </div>
+
+                <div class="profile-divider"><span>Контактные данные</span></div>
+
+                <form class="profile-edit-form" id="clientProfileForm" novalidate>
+                    <div class="form-group"><label for="clientEmail">Email</label><input type="email" id="clientEmail" disabled></div>
+                    <div class="form-group"><label for="clientPhone">Телефон</label><input type="tel" id="clientPhone"><span class="form-error" id="clientPhoneError"></span></div>
+                    <div class="form-group">
+                        <label for="clientTimezone">Часовой пояс</label>
+                        <select id="clientTimezone">
+                            <option value="Europe/Kaliningrad">Калининград (UTC+2)</option>
+                            <option value="Europe/Moscow">Москва (UTC+3)</option>
+                            <option value="Europe/Samara">Самара (UTC+4)</option>
+                            <option value="Asia/Yekaterinburg">Екатеринбург (UTC+5)</option>
+                            <option value="Asia/Omsk">Омск (UTC+6)</option>
+                            <option value="Asia/Krasnoyarsk">Красноярск (UTC+7)</option>
+                            <option value="Asia/Irkutsk">Иркутск (UTC+8)</option>
+                            <option value="Asia/Yakutsk">Якутск (UTC+9)</option>
+                            <option value="Asia/Vladivostok">Владивосток (UTC+10)</option>
+                        </select>
+                    </div>
+                    <div class="profile-edit-actions"><button type="submit" class="btn-save-profile" id="saveClientProfileBtn">Сохранить изменения</button></div>
+                    <div class="form-message" id="clientProfileMessage"></div>
+                </form>
+
+                <div class="security-block">
+                    <h3>Безопасность</h3>
+                    <div class="password-status" id="clientPasswordStatus">
+                        <span class="password-status-icon" id="clientPasswordStatusIcon">✓</span>
+                        <div class="password-status-text">
+                            <strong id="clientPasswordStatusTitle">Пароль в порядке</strong>
+                            <span id="clientPasswordStatusDesc">Пароль был установлен недавно.</span>
+                            <div class="password-age-bar"><div class="password-age-fill" id="clientPasswordAgeFill" style="width: 0%;"></div></div>
+                            <div class="password-age-text" id="clientPasswordAgeText"></div>
+                        </div>
+                    </div>
+                    <button type="button" class="btn-change-password" id="clientChangePasswordBtn">Сменить пароль</button>
+                    <div class="change-password-form" id="clientChangePasswordForm">
+                        <div class="form-group"><label for="clientCurrentPassword">Текущий пароль</label><input type="password" id="clientCurrentPassword"><span class="form-error" id="clientCurrentPasswordError"></span></div>
+                        <div class="form-group"><label for="clientNewPassword">Новый пароль</label><input type="password" id="clientNewPassword"><span class="form-error" id="clientNewPasswordError"></span></div>
+                        <div class="form-group"><label for="clientNewPassword2">Повторите пароль</label><input type="password" id="clientNewPassword2"><span class="form-error" id="clientNewPassword2Error"></span></div>
+                        <div class="change-password-actions">
+                            <button type="button" class="btn-confirm-password" id="clientConfirmPasswordBtn">Сменить</button>
+                            <button type="button" class="btn-cancel-password" id="clientCancelPasswordBtn">Отмена</button>
+                        </div>
+                        <div class="change-password-message" id="clientChangePasswordMessage"></div>
+                    </div>
+                </div>
+            </div>
+        `;
+    }
+
+    // --- 2. НАСТРАИВАЕМ ВИД В ЗАВИСИМОСТИ ОТ РОЛИ ---
+
+    // Заполняем реальные ФИО
     var realF = document.getElementById('clientRealFirstName');
     var realM = document.getElementById('clientRealMiddleName');
     var realL = document.getElementById('clientRealLastName');
@@ -118,12 +218,15 @@ export function renderClientProfile() {
     if (realM) realM.textContent = user.realMiddleName || '—';
     if (realL) realL.textContent = user.realLastName || '—';
 
+    // Бейдж
     var badge = document.getElementById('clientVerifyBadge');
     if (badge) {
-        var currentRole = window.CURRENT_USER || 'client';
         if (currentRole === 'support') {
             badge.className = 'verify-badge pending';
             badge.textContent = '🛟 Сотрудник Поддержки';
+        } else if (currentRole === 'owner' || currentRole === 'admin') {
+            badge.className = 'verify-badge';
+            badge.textContent = '🛡️ Администратор';
         } else {
             var status = user.psychologistStatus || 'none';
             if (status === 'pending') {
@@ -138,6 +241,8 @@ export function renderClientProfile() {
 
     var dispF = document.getElementById('displayFirstName');
     var dispM = document.getElementById('displayMiddleName');
+    var groupF = document.getElementById('displayFirstNameGroup');
+    var groupM = document.getElementById('displayMiddleNameGroup');
     
     var safeFirstName = (user.displayFirstName || '').trim();
     var safeMiddleName = (user.displayMiddleName || '').trim();
@@ -145,22 +250,37 @@ export function renderClientProfile() {
     if (safeFirstName.includes('@')) safeFirstName = '';
     if (safeMiddleName.includes('@')) safeMiddleName = '';
 
-    if (window.CURRENT_USER === 'support') {
+    // Скрываем/показываем поля по таблице
+    if (currentRole === 'support') {
+        // Поддержка: только Псевдоним (вместо Отчества)
+        if (groupF) groupF.style.display = 'none';
+        if (groupM) groupM.style.display = '';
         if (dispM) {
             dispM.value = user.supportDisplayName || '';
             dispM.placeholder = 'Например: Илья';
             var labelM = dispM.previousElementSibling;
             if (labelM && labelM.tagName === 'LABEL') labelM.textContent = 'Имя в чатах (псевдоним)';
         }
-        if (dispF) {
-            dispF.value = ''; 
-            var labelF = dispF.previousElementSibling;
-            if (labelF && labelF.tagName === 'LABEL') labelF.textContent = '';
-            dispF.style.display = 'none';
-        }
+    } else if (currentRole === 'psychologist') {
+        // Психолог: ТОЛЬКО реальное (скрываем транслируемые)
+        if (groupF) groupF.style.display = 'none';
+        if (groupM) groupM.style.display = 'none';
     } else {
+        // Клиент и Админ: оба поля
+        if (groupF) groupF.style.display = '';
+        if (groupM) groupM.style.display = '';
         if (dispF) dispF.value = safeFirstName;
         if (dispM) dispM.value = safeMiddleName;
+        
+        // Восстанавливаем подписи
+        if (dispF) {
+            var labelF2 = dispF.previousElementSibling;
+            if (labelF2 && labelF2.tagName === 'LABEL') labelF2.textContent = 'Имя (транслируемое)';
+        }
+        if (dispM) {
+            var labelM2 = dispM.previousElementSibling;
+            if (labelM2 && labelM2.tagName === 'LABEL') labelM2.textContent = 'Отчество (транслируемое)';
+        }
     }
 
     var preview = document.getElementById('displayNamePreview');
@@ -245,8 +365,8 @@ async function handleClientProfileSave(e) {
     var tzEl = document.getElementById('clientTimezone');
     var msgEl = document.getElementById('clientProfileMessage');
 
-    var displayFirstName = dispF && dispF.style.display !== 'none' ? dispF.value.trim() : '';
-    var displayMiddleName = dispM ? dispM.value.trim() : '';
+    var displayFirstName = dispF && dispF.parentElement.style.display !== 'none' ? dispF.value.trim() : '';
+    var displayMiddleName = dispM && dispM.parentElement.style.display !== 'none' ? dispM.value.trim() : '';
     var phone = phoneEl ? phoneEl.value.trim() : '';
     var timezone = tzEl ? tzEl.value : 'Europe/Moscow';
 

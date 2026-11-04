@@ -36,15 +36,18 @@ export const MENU = {
         { section: 'profile',  href: '/pages/dashboard.html?section=profile',  label: 'Личная страница',  icon: ICONS.user },
         { section: 'reports',  href: '/pages/dashboard.html?section=reports',  label: 'Отчёты',           icon: ICONS.chart }
     ],
-    owner: [
+        owner: [
         { section: 'dashboard',    href: '/pages/admin.html?section=dashboard',    label: 'Сводка',      icon: ICONS.dashboard },
         { section: 'applications', href: '/pages/admin.html?section=applications', label: 'Заявки',      icon: ICONS.userCheck, badge: true },
         { section: 'messages',     href: '/pages/admin.html?section=messages',     label: 'Сообщения',   icon: ICONS.chat, badge: true },
         { section: 'users',        href: '/pages/admin.html?section=users',        label: 'Пользователи', icon: ICONS.users },
-        { section: 'reports',      href: '/pages/admin.html?section=reports',      label: 'Отчёты',      icon: ICONS.chart }
+        { section: 'reports',      href: '/pages/admin.html?section=reports',      label: 'Отчёты',      icon: ICONS.chart },
+        { section: 'profile',      href: '/pages/admin.html?section=profile',      label: 'Профиль',     icon: ICONS.user },
+        { section: 'planner',      href: '/pages/admin.html?section=planner',      label: 'Планировщик', icon: ICONS.calendar }
     ],
-            support: [
-        { section: 'messages', href: '/pages/admin.html?section=messages&view=support', label: 'Чаты', icon: ICONS.chat, badge: true },
-        { section: 'profile',  href: '/pages/client.html?section=profile',             label: 'Профиль', icon: ICONS.user }
+    support: [
+        { section: 'messages', href: '/pages/admin.html?section=messages&view=support', label: 'Чаты',      icon: ICONS.chat, badge: true },
+        { section: 'profile',  href: '/pages/admin.html?section=profile&view=support',  label: 'Профиль',   icon: ICONS.user },
+        { section: 'planner',  href: '/pages/admin.html?section=planner&view=support',  label: 'Календарь', icon: ICONS.calendar }
     ]
 };

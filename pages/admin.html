@@ -20,27 +20,62 @@
                     <!-- ЗАЯВКИ -->
                     <div id="applicationsSection" style="display:none;"></div>
 
-                    <!-- СООБЩЕНИЯ -->
-                    <div id="messagesSection" style="display:none;">
-    <div class="messenger-hint">
-        🔒 Все коммуникации — только внутри платформы. Контакты участников скрыты.
-    </div>
-    <div class="messenger-layout" id="messengerLayout">
-        <div class="chats-panel">
-            <div class="chats-header">
-                <h3>Чаты</h3>
-            </div>
-            <div class="chats-list" id="chatsList"></div>
-        </div>
-        <div class="chat-window" id="chatWindow"></div>
-    </div>
-</div>
+                    <!-- ЧАТЫ ПОДДЕРЖКИ -->
+                    <div id="supportChatsSection" style="display:none;">
+                        <div class="messenger-layout" id="messengerLayoutSupport">
+                            <div class="chats-panel">
+                                <div class="chats-header"><h3>Обращения</h3></div>
+                                <div class="chats-list" id="chatsListSupport"></div>
+                            </div>
+                            <div class="chat-window" id="chatWindowSupport"></div>
+                        </div>
+                    </div>
 
-                    <!-- ПРОФИЛЬ ПОДДЕРЖКИ -->
-                    <div id="profileSection" style="display:none;"></div>
+                                        <!-- ЧАТЫ ПОДДЕРЖКИ ПСИХОЛОГОВ -->
+                    <div id="supportPsyChatsSection" style="display:none;">
+                        <div class="messenger-layout" id="messengerLayoutSupportPsy">
+                            <div class="chats-panel">
+                                <div class="chats-header"><h3>Обращения психологов</h3></div>
+                                <div class="chats-list" id="chatsListSupportPsy"></div>
+                            </div>
+                            <div class="chat-window" id="chatWindowSupportPsy"></div>
+                        </div>
+                    </div>
+
+                    <!-- ЛИЧНЫЕ СООБЩЕНИЯ АДМИНА -->
+                    <div id="adminChatsSection" style="display:none;">
+                        <div class="messenger-layout" id="messengerLayoutAdmin">
+                            <div class="chats-panel">
+                                <div class="chats-header"><h3>Мои чаты</h3></div>
+                                <div class="chats-list" id="chatsListAdmin"></div>
+                            </div>
+                            <div class="chat-window" id="chatWindowAdmin"></div>
+                        </div>
+                    </div>
 
                     <!-- ПОЛЬЗОВАТЕЛИ -->
                     <div id="usersSection" style="display:none;"></div>
+
+                    <!-- ПРОФИЛЬ -->
+                    <div id="profileSection" style="display:none;"></div>
+
+                    <!-- ПЛАНИРОВЩИК (КАЛЕНДАРЬ) -->
+                    <div id="calendarSection" style="display:none;">
+                        <div class="calendar-toolbar">
+                            <div class="calendar-nav">
+                                <button class="btn-nav" id="prevWeek">←</button>
+                                <span class="calendar-period" id="calendarPeriod">Ноябрь 2026</span>
+                                <button class="btn-nav" id="nextWeek">→</button>
+                                <button class="btn-today" id="todayBtn">Сегодня</button>
+                            </div>
+                            <div class="calendar-actions">
+                                <button class="btn-add-event" id="addEventBtn">+ Событие</button>
+                            </div>
+                        </div>
+                        <div class="calendar-wrapper">
+                            <div class="calendar-grid" id="calendarGrid"></div>
+                        </div>
+                    </div>
                 </main>
             </div>
         </div>

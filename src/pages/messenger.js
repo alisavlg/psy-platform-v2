@@ -1,5 +1,5 @@
 // ============================================
-// СООБЩЕНИЯ — единый модуль (финальная версия)
+// СООБЩЕНИЯ — единый модуль (финал)
 // ============================================
 
 import { supa } from '@/lib/supabase.js';
@@ -13,8 +13,8 @@ var m_currentChatId = null;
 var m_currentMessages = [];
 var m_pollTimer = null;
 
-// ID вашего профиля психолога (или виртуальной поддержки, если решим её вернуть)
 const SUPPORT_ID = '00000000-0000-0000-0000-000000000000';
+const SUPPORT_PSY_ID = '6e90ecbe-8d79-4a59-88ce-b7ee2c4fe8a4';
 
 function m_escapeHtml(text) {
     var div = document.createElement('div');
@@ -25,12 +25,7 @@ function m_escapeHtml(text) {
 function m_getInitials(name) {
     if (!name) return '?';
     if (typeof name !== 'string') name = String(name);
-    return name.split(' ')
-        .filter(function (w) { return w.length > 0; })
-        .map(function (w) { return w[0]; })
-        .slice(0, 2)
-        .join('')
-        .toUpperCase();
+    return name.split(' ').filter(function (w) { return w.length > 0; }).map(function (w) { return w[0]; }).slice(0, 2).join('').toUpperCase();
 }
 
 function m_formatChatTime(iso) {
@@ -38,7 +33,6 @@ function m_formatChatTime(iso) {
     var d = new Date(iso);
     var now = new Date();
     var diffDays = Math.floor((now - d) / 86400000);
-
     if (diffDays === 0) return String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0');
     if (diffDays === 1) return 'вчера';
     if (diffDays < 7) return ['вс', 'пн', 'вт', 'ср', 'чт', 'пт', 'сб'][d.getDay()];
@@ -52,7 +46,6 @@ async function m_loadMyUser() {
         var u = JSON.parse(raw);
         if (!u.id) return null;
         
-        // Запрашиваем актуальные данные из БД (чтобы взять support_display_name)
         var res = await supa.from('profiles').select('support_display_name, support_avatar_url, display_first_name, display_middle_name').eq('id', u.id).single();
         var profile = res.data || {};
 
@@ -66,25 +59,55 @@ async function m_loadMyUser() {
     } catch (e) { return null; }
 }
 
+async function m_ensureSupportChat() {
+    if (!m_myUser || m_myUser.role === 'support' || m_myUser.role === 'owner' || m_myUser.role === 'admin') return;
+
+    var existRes = await supa.from('chats').select('*').eq('client_id', m_myUser.id).eq('partner_id', SUPPORT_ID).limit(1);
+    if (existRes.data && existRes.data.length > 0) return existRes.data[0];
+
+    var me = m_myUser.userData;
+    var c1 = (me.displayFirstName || me.realFirstName || '').trim();
+    var c2 = (me.displayMiddleName || me.realMiddleName || '').trim();
+    var displayName = (c1 + ' ' + c2).trim() || 'Клиент';
+
+    var insertRes = await supa.from('chats').insert({
+        client_id: m_myUser.id,
+        partner_id: SUPPORT_ID,
+        client_display_name: displayName,
+        psychologist_display_name: 'Поддержка Eupsy',
+        last_message_at: new Date().toISOString()
+    }).select().single();
+
+    if (insertRes.error) return null;
+    return insertRes.data;
+}
+
 async function m_loadChats() {
     if (!m_myUser) return [];
 
-    var isAdminView = (m_myUser.role === 'support' || m_myUser.role === 'compliance' || m_myUser.role === 'owner' || m_myUser.role === 'admin');
+    var isSupportView = (m_myUser.role === 'support' || m_myUser.role === 'compliance');
 
-    if (isAdminView) {
-        // Собственник и Поддержка видят все чаты (или только те, что касаются психологов)
-        var res = await supa.from('chats').select('*').order('last_message_at', { ascending: false });
+    if (isSupportView) {
+        var res = await supa.from('chats').select('*').eq('partner_id', SUPPORT_ID).order('last_message_at', { ascending: false });
         return res.data || [];
     }
 
-    var query = supa.from('chats').select('*');
-    // Психолог видит чаты, где он психолог, а клиент — где он клиент
-    query = query.or('client_id.eq.' + m_myUser.id + ',psychologist_id.eq.' + m_myUser.id);
+    await m_ensureSupportChat();
 
+    var query = supa.from('chats').select('*');
+    query = query.or('client_id.eq.' + m_myUser.id + ',partner_id.eq.' + m_myUser.id);
     var result = await query.order('last_message_at', { ascending: false });
     if (result.error) return [];
-    
-    return result.data || [];
+
+    var chats = result.data || [];
+    chats.sort(function(a, b) {
+        var aSupp = (a.partner_id === SUPPORT_ID);
+        var bSupp = (b.partner_id === SUPPORT_ID);
+        if (aSupp && !bSupp) return -1;
+        if (!aSupp && bSupp) return 1;
+        return new Date(b.last_message_at).getTime() - new Date(a.last_message_at).getTime();
+    });
+    return chats;
 }
 
 async function m_loadUnreadCounts() {
@@ -115,7 +138,7 @@ function m_avatarHtml(avatarUrl, initials, extraClass) {
 }
 
 function m_renderChatsList() {
-    var listEl = document.getElementById('chatsList');
+    var listEl = document.getElementById('chatsList') || document.getElementById('chatsListSupport') || document.getElementById('chatsListAdmin');
     if (!listEl) return;
     if (!m_cachedChats.length) {
         listEl.innerHTML = '<div style="padding:20px;text-align:center;color:#888;font-size:14px;">Пока нет диалогов.</div>';
@@ -123,27 +146,31 @@ function m_renderChatsList() {
     }
     listEl.innerHTML = '';
     
-    var isAdminView = (m_myUser.role === 'support' || m_myUser.role === 'compliance' || m_myUser.role === 'owner' || m_myUser.role === 'admin');
+    var isSupportView = (m_myUser.role === 'support' || m_myUser.role === 'compliance');
 
     m_cachedChats.forEach(function (chat) {
+        var isSupport = (chat.partner_id === SUPPORT_ID);
         var name = '';
         
-        if (isAdminView) {
+        if (isSupportView) {
             name = chat.client_display_name || 'Клиент';
+        } else if (isSupport) {
+            name = 'Поддержка Eupsy';
         } else if (chat.client_id === m_myUser.id) {
             name = chat.psychologist_display_name || 'Психолог';
         } else {
             name = chat.client_display_name || 'Клиент';
         }
 
-        var initials = m_getInitials(name);
+        var initials = isSupport ? '🛟' : m_getInitials(name);
         var preview = chat.last_message_text || 'Нет сообщений';
         var timeStr = m_formatChatTime(chat.last_message_at);
         var unread = m_unreadCounts[chat.id] || 0;
-        var avatarUrl = (isAdminView || chat.client_id === m_myUser.id) ? (chat.psychologist_avatar || '') : (chat.client_avatar || '');
+        var avatarUrl = isSupport ? '' : (isSupportView || chat.client_id === m_myUser.id ? (chat.psychologist_avatar || '') : (chat.client_avatar || ''));
 
         var item = document.createElement('div');
         item.className = 'chat-item' + (chat.id === m_currentChatId ? ' active' : '');
+        if (isSupport && !isSupportView) item.style.borderLeft = '3px solid #4a90e2';
         
         item.innerHTML =
             m_avatarHtml(avatarUrl, initials, 'chat-avatar') +
@@ -157,7 +184,7 @@ function m_renderChatsList() {
 }
 
 function m_renderChatWindow() {
-    var windowEl = document.getElementById('chatWindow');
+    var windowEl = document.getElementById('chatWindow') || document.getElementById('chatWindowSupport') || document.getElementById('chatWindowAdmin');
     if (!windowEl) return;
     if (!m_currentChatId) {
         windowEl.innerHTML = '<div class="chat-empty"><div class="chat-empty-icon">💬</div><p>Выберите чат слева, чтобы начать общение</p></div>';
@@ -166,24 +193,22 @@ function m_renderChatWindow() {
     var chat = m_cachedChats.find(function (c) { return c.id === m_currentChatId; });
     if (!chat) { m_currentChatId = null; return m_renderChatWindow(); }
 
-    var isAdminView = (m_myUser.role === 'support' || m_myUser.role === 'compliance' || m_myUser.role === 'owner' || m_myUser.role === 'admin');
-    
-        var name = '';
-    if (m_myUser.role === 'support') {
-        // Если мы в Поддержке и отвечаем клиенту, показываем имя клиента
+    var isSupportView = (m_myUser.role === 'support' || m_myUser.role === 'compliance');
+    var isSupport = (chat.partner_id === SUPPORT_ID);
+    var name = '';
+
+    if (isSupportView) {
         name = chat.client_display_name || 'Клиент';
-    } else if (isAdminView) {
-        // Если мы Админ (Собственник), тоже видим имя клиента
-        name = chat.client_display_name || 'Клиент';
+    } else if (isSupport) {
+        name = 'Поддержка Eupsy';
     } else if (chat.client_id === m_myUser.id) {
-        // Если мы Клиент, видим имя Психолога
         name = chat.psychologist_display_name || 'Психолог';
     } else {
-        // Если мы Психолог, видим имя Клиента
         name = chat.client_display_name || 'Клиент';
     }
-    var roleLabel = isAdminView ? 'Клиент' : (chat.client_id === m_myUser.id ? 'Психолог' : 'Клиент');
-    var initials = m_getInitials(name);
+
+    var roleLabel = isSupport ? 'Служба заботы' : (isSupportView ? 'Клиент' : (chat.client_id === m_myUser.id ? 'Психолог' : 'Клиент'));
+    var initials = isSupport ? '🛟' : m_getInitials(name);
     var isEmpty = m_currentMessages.length === 0;
     var messagesHtml = '';
 
@@ -249,19 +274,23 @@ async function m_sendMessage() {
     input.value = '';
     input.disabled = true;
 
+    var chat = m_cachedChats.find(function(c) { return c.id === m_currentChatId; });
+    var isSupportChat = chat && (chat.partner_id === SUPPORT_ID);
+    var isSupportView = (m_myUser.role === 'support' || m_myUser.role === 'compliance');
+
+    var authorId = m_myUser.id;
+    if (isSupportView && isSupportChat) {
+        authorId = SUPPORT_ID;
+    }
+
     try {
         await supa.from('messages').insert({ 
             chat_id: m_currentChatId, 
-            author_id: m_myUser.id, // Отправляем от вашего реального ID
-            author_role: m_myUser.role, // И записываем роль (client, psychologist, support и т.д.)
+            author_id: authorId, 
+            author_role: m_myUser.role, 
             text: text 
         });
 
-            // Определяем, от чьего лица писать
-    var authorName = m_myUser.id; // По умолчанию ваш ID
-    if (m_myUser.role === 'support') {
-        authorName = m_myUser.supportName; // Имя из профиля поддержки
-    }
         await supa.from('chats').update({ last_message_text: text, last_message_at: new Date().toISOString() }).eq('id', m_currentChatId);
         
         m_currentMessages = await m_loadMessages(m_currentChatId);
@@ -310,13 +339,36 @@ async function m_updateSidebarBadge() {
     }
 }
 
-export async function renderMessenger() {
-    var layoutEl = document.getElementById('messengerLayout');
+export async function renderMessenger(viewMode) {
+    var isSupportClient = (viewMode === 'support');
+    var isSupportPsy = (viewMode === 'support_psy');
+    
+    var layoutId, listId, windowId;
+
+    if (isSupportClient) {
+        layoutId = 'messengerLayoutSupport';
+        listId = 'chatsListSupport';
+        windowId = 'chatWindowSupport';
+    } else if (isSupportPsy) {
+        layoutId = 'messengerLayoutSupportPsy';
+        listId = 'chatsListSupportPsy';
+        windowId = 'chatWindowSupportPsy';
+    } else {
+        layoutId = 'messengerLayout';
+        listId = 'chatsList';
+        windowId = 'chatWindow';
+    }
+
+    var layoutEl = document.getElementById(layoutId);
     if (!layoutEl) return;
+
+    window._messengerListId = listId;
+    window._messengerWindowId = windowId;
+
     if (!m_myUser) m_myUser = await m_loadMyUser();
     if (!m_myUser) return;
 
-    m_cachedChats = await m_loadChats();
+    m_cachedChats = await m_loadChats(viewMode);
     await m_loadUnreadCounts();
 
     var params = new URLSearchParams(window.location.search);
@@ -324,7 +376,7 @@ export async function renderMessenger() {
     var chatId = params.get('chat');
 
     if (psyId && !m_currentChatId) {
-        var exist = m_cachedChats.find(function(c) { return c.psychologist_id === psyId || c.id === psyId; });
+        var exist = m_cachedChats.find(function(c) { return c.partner_id === psyId || c.id === psyId; });
         if (exist) { m_currentChatId = exist.id; }
         var url = new URL(window.location.href);
         url.searchParams.delete('psyId');
