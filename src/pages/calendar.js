@@ -89,10 +89,6 @@ async function loadPsychologistProfile() {
     } catch (err) { return null; }
 }
 
-// ============================================
-// ЗАГРУЗКА СОБЫТИЙ (С УЧЕТОМ РОЛИ)
-// ============================================
-
 async function loadEvents() {
     var userId = getCurrentUserId();
     if (!userId || !supa) return [];
@@ -100,12 +96,9 @@ async function loadEvents() {
         var query = supa.from('events').select('*');
         var currentRole = window.CURRENT_USER || 'client';
 
-        // Если мы Психолог или Поддержка/Админ, и у нас есть профиль психолога,
-        // мы хотим видеть события, где мы - партнер (psychologist_id/partner_id).
         if (userPsychologistProfileId && (currentRole === 'psychologist' || currentRole === 'owner' || currentRole === 'admin' || currentRole === 'support')) {
             query = query.or('owner_id.eq.' + userId + ',partner_id.eq.' + userPsychologistProfileId);
         } else {
-            // Для клиента (и всех остальных) - только свои личные события
             query = query.eq('owner_id', userId);
         }
 
@@ -159,11 +152,14 @@ async function updateEventInSupabase(eventId, data) {
 // ============================================
 
 export async function renderCalendar() {
-    var grid = document.getElementById('calendarGrid');
-    var periodEl = document.getElementById('calendarPeriod');
-    if (!grid) return;
+    var container = document.getElementById('calendarSection');
+if (container && container.innerHTML.trim() === '') {
+    container.innerHTML = `...`; // (тот самый блок с разметкой, который у вас уже есть)
+}
+var grid = document.getElementById('calendarGrid');
+var periodEl = document.getElementById('calendarPeriod');
+if (!grid) return;
 
-    // --- 1. СОЗДАЕМ РАЗМЕТКУ, ЕСЛИ ЕЕ НЕТ (для админки) ---
     var container = document.getElementById('calendarSection');
     if (container && container.innerHTML.trim() === '') {
         container.innerHTML = `
