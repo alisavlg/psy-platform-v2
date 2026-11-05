@@ -45,9 +45,10 @@ export const MENU = {
         { section: 'profile',      href: '/pages/admin.html?section=profile',      label: 'Профиль',     icon: ICONS.user },
         { section: 'planner',      href: '/pages/admin.html?section=planner',      label: 'Планировщик', icon: ICONS.calendar }
     ],
-    support: [
-        { section: 'messages', href: '/pages/admin.html?section=messages&view=support', label: 'Чаты',      icon: ICONS.chat, badge: true },
-        { section: 'profile',  href: '/pages/admin.html?section=profile&view=support',  label: 'Профиль',   icon: ICONS.user },
+        support: [
+        { section: 'messages', href: '/pages/admin.html?section=messages&view=support', label: 'Поддержка', icon: ICONS.chat, badge: true },
+        { section: 'support_psy', href: '/pages/admin.html?section=support_psy&view=support', label: 'Поддержка Eupsy', icon: ICONS.chat, badge: true },
+        { section: 'profile',  href: '/pages/admin.html?section=profile&view=support',  label: 'Профиль', icon: ICONS.user },
         { section: 'planner',  href: '/pages/admin.html?section=planner&view=support',  label: 'Календарь', icon: ICONS.calendar }
     ]
 };

@@ -60,35 +60,54 @@ async function m_loadMyUser() {
 }
 
 async function m_ensureSupportChat() {
-    if (!m_myUser || m_myUser.role === 'support' || m_myUser.role === 'owner' || m_myUser.role === 'admin') return;
+    if (!m_myUser) return;
+    if (m_myUser.role === 'support' || m_myUser.role === 'owner' || m_myUser.role === 'admin') return;
 
-    var existRes = await supa.from('chats').select('*').eq('client_id', m_myUser.id).eq('partner_id', SUPPORT_ID).limit(1);
+    var partnerId = null;
+    if (m_myUser.role === 'psychologist') {
+        partnerId = SUPPORT_PSY_ID; // Поддержка психологов
+    } else {
+        partnerId = SUPPORT_ID; // Поддержка клиентов
+    }
+
+    var existRes = await supa.from('chats').select('*').eq('client_id', m_myUser.id).eq('partner_id', partnerId).limit(1);
     if (existRes.data && existRes.data.length > 0) return existRes.data[0];
 
     var me = m_myUser.userData;
     var c1 = (me.displayFirstName || me.realFirstName || '').trim();
     var c2 = (me.displayMiddleName || me.realMiddleName || '').trim();
-    var displayName = (c1 + ' ' + c2).trim() || 'Клиент';
+    var displayName = (c1 + ' ' + c2).trim() || (m_myUser.role === 'psychologist' ? 'Психолог' : 'Клиент');
+
+    var supportName = (m_myUser.role === 'psychologist') ? 'Поддержка психологов' : 'Поддержка клиентов';
 
     var insertRes = await supa.from('chats').insert({
         client_id: m_myUser.id,
-        partner_id: SUPPORT_ID,
+        partner_id: partnerId,
         client_display_name: displayName,
-        psychologist_display_name: 'Поддержка Eupsy',
+        psychologist_display_name: supportName,
         last_message_at: new Date().toISOString()
     }).select().single();
 
-    if (insertRes.error) return null;
+    if (insertRes.error) {
+        console.error('[messenger] ошибка создания чата с поддержкой:', insertRes.error);
+        return null;
+    }
     return insertRes.data;
 }
 
-async function m_loadChats() {
+async function m_loadChats(viewMode) {
     if (!m_myUser) return [];
 
-    var isSupportView = (m_myUser.role === 'support' || m_myUser.role === 'compliance');
+    var isSupportClient = (viewMode === 'support');
+    var isSupportPsy = (viewMode === 'support_psy');
 
-    if (isSupportView) {
+    if (isSupportClient) {
         var res = await supa.from('chats').select('*').eq('partner_id', SUPPORT_ID).order('last_message_at', { ascending: false });
+        return res.data || [];
+    }
+
+    if (isSupportPsy) {
+        var res = await supa.from('chats').select('*').eq('partner_id', SUPPORT_PSY_ID).order('last_message_at', { ascending: false });
         return res.data || [];
     }
 
@@ -101,8 +120,8 @@ async function m_loadChats() {
 
     var chats = result.data || [];
     chats.sort(function(a, b) {
-        var aSupp = (a.partner_id === SUPPORT_ID);
-        var bSupp = (b.partner_id === SUPPORT_ID);
+        var aSupp = (a.partner_id === SUPPORT_ID || a.partner_id === SUPPORT_PSY_ID);
+        var bSupp = (b.partner_id === SUPPORT_ID || b.partner_id === SUPPORT_PSY_ID);
         if (aSupp && !bSupp) return -1;
         if (!aSupp && bSupp) return 1;
         return new Date(b.last_message_at).getTime() - new Date(a.last_message_at).getTime();
