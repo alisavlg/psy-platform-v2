@@ -1,5 +1,5 @@
 // ============================================
-// СООБЩЕНИЯ — единый модуль (финал)
+// СООБЩЕНИЯ — единый модуль (новая архитектура)
 // ============================================
 
 import { supa } from '@/lib/supabase.js';
@@ -13,7 +13,8 @@ var m_currentChatId = null;
 var m_currentMessages = [];
 var m_pollTimer = null;
 
-const SUPPORT_ID = '00000000-0000-0000-0000-000000000000';
+// ID служб (для быстрой проверки)
+const SUPPORT_CLIENT_ID = '00000000-0000-0000-0000-000000000000';
 const SUPPORT_PSY_ID = '6e90ecbe-8d79-4a59-88ce-b7ee2c4fe8a4';
 
 function m_escapeHtml(text) {
@@ -59,18 +60,23 @@ async function m_loadMyUser() {
     } catch (e) { return null; }
 }
 
+// ============================================
+// Создание чата с Поддержкой
+// ============================================
+
 async function m_ensureSupportChat() {
     if (!m_myUser) return;
     if (m_myUser.role === 'support' || m_myUser.role === 'owner' || m_myUser.role === 'admin') return;
 
-    var partnerId = null;
-    if (m_myUser.role === 'psychologist') {
-        partnerId = SUPPORT_PSY_ID; // Поддержка психологов
-    } else {
-        partnerId = SUPPORT_ID; // Поддержка клиентов
-    }
+    var targetRole = (m_myUser.role === 'psychologist') ? 'support_psy' : 'support_client';
+    var targetId = (m_myUser.role === 'psychologist') ? SUPPORT_PSY_ID : SUPPORT_CLIENT_ID;
 
-    var existRes = await supa.from('chats').select('*').eq('client_id', m_myUser.id).eq('partner_id', partnerId).limit(1);
+    var existRes = await supa.from('chats')
+        .select('*')
+        .eq('sender_id', m_myUser.id)
+        .eq('recipient_id', targetId)
+        .limit(1);
+
     if (existRes.data && existRes.data.length > 0) return existRes.data[0];
 
     var me = m_myUser.userData;
@@ -78,13 +84,11 @@ async function m_ensureSupportChat() {
     var c2 = (me.displayMiddleName || me.realMiddleName || '').trim();
     var displayName = (c1 + ' ' + c2).trim() || (m_myUser.role === 'psychologist' ? 'Психолог' : 'Клиент');
 
-    var supportName = (m_myUser.role === 'psychologist') ? 'Поддержка психологов' : 'Поддержка клиентов';
-
     var insertRes = await supa.from('chats').insert({
-        client_id: m_myUser.id,
-        partner_id: partnerId,
-        client_display_name: displayName,
-        psychologist_display_name: supportName,
+        sender_id: m_myUser.id,
+        sender_role: m_myUser.role,
+        recipient_id: targetId,
+        recipient_role: targetRole,
         last_message_at: new Date().toISOString()
     }).select().single();
 
@@ -95,6 +99,10 @@ async function m_ensureSupportChat() {
     return insertRes.data;
 }
 
+// ============================================
+// Загрузка чатов
+// ============================================
+
 async function m_loadChats(viewMode) {
     if (!m_myUser) return [];
 
@@ -102,26 +110,26 @@ async function m_loadChats(viewMode) {
     var isSupportPsy = (viewMode === 'support_psy');
 
     if (isSupportClient) {
-        var res = await supa.from('chats').select('*').eq('partner_id', SUPPORT_ID).order('last_message_at', { ascending: false });
+        var res = await supa.from('chats').select('*').eq('recipient_role', 'support_client').order('last_message_at', { ascending: false });
         return res.data || [];
     }
 
     if (isSupportPsy) {
-        var res = await supa.from('chats').select('*').eq('partner_id', SUPPORT_PSY_ID).order('last_message_at', { ascending: false });
+        var res = await supa.from('chats').select('*').eq('recipient_role', 'support_psy').order('last_message_at', { ascending: false });
         return res.data || [];
     }
 
     await m_ensureSupportChat();
 
     var query = supa.from('chats').select('*');
-    query = query.or('client_id.eq.' + m_myUser.id + ',partner_id.eq.' + m_myUser.id);
+    query = query.or('sender_id.eq.' + m_myUser.id + ',recipient_id.eq.' + m_myUser.id);
     var result = await query.order('last_message_at', { ascending: false });
     if (result.error) return [];
 
     var chats = result.data || [];
     chats.sort(function(a, b) {
-        var aSupp = (a.partner_id === SUPPORT_ID || a.partner_id === SUPPORT_PSY_ID);
-        var bSupp = (b.partner_id === SUPPORT_ID || b.partner_id === SUPPORT_PSY_ID);
+        var aSupp = (a.recipient_role === 'support_client' || a.recipient_role === 'support_psy');
+        var bSupp = (b.recipient_role === 'support_client' || b.recipient_role === 'support_psy');
         if (aSupp && !bSupp) return -1;
         if (!aSupp && bSupp) return 1;
         return new Date(b.last_message_at).getTime() - new Date(a.last_message_at).getTime();
@@ -157,7 +165,7 @@ function m_avatarHtml(avatarUrl, initials, extraClass) {
 }
 
 function m_renderChatsList() {
-    var listEl = document.getElementById('chatsList') || document.getElementById('chatsListSupport') || document.getElementById('chatsListAdmin');
+    var listEl = document.getElementById('chatsList') || document.getElementById('chatsListSupport') || document.getElementById('chatsListAdmin') || document.getElementById('chatsListSupportPsy');
     if (!listEl) return;
     if (!m_cachedChats.length) {
         listEl.innerHTML = '<div style="padding:20px;text-align:center;color:#888;font-size:14px;">Пока нет диалогов.</div>';
@@ -168,24 +176,22 @@ function m_renderChatsList() {
     var isSupportView = (m_myUser.role === 'support' || m_myUser.role === 'compliance');
 
     m_cachedChats.forEach(function (chat) {
-        var isSupport = (chat.partner_id === SUPPORT_ID);
+        var isSupport = (chat.recipient_role === 'support_client' || chat.recipient_role === 'support_psy');
         var name = '';
         
         if (isSupportView) {
-            name = chat.client_display_name || 'Клиент';
+            name = chat.sender_id === m_myUser.id ? 'Клиент' : 'Психолог';
         } else if (isSupport) {
-            name = 'Поддержка Eupsy';
-        } else if (chat.client_id === m_myUser.id) {
-            name = chat.psychologist_display_name || 'Психолог';
+            name = (chat.recipient_role === 'support_psy') ? 'Поддержка Психологов' : 'Поддержка Клиентов';
         } else {
-            name = chat.client_display_name || 'Клиент';
+            name = chat.sender_id === m_myUser.id ? 'Психолог' : 'Клиент';
         }
 
         var initials = isSupport ? '🛟' : m_getInitials(name);
         var preview = chat.last_message_text || 'Нет сообщений';
         var timeStr = m_formatChatTime(chat.last_message_at);
         var unread = m_unreadCounts[chat.id] || 0;
-        var avatarUrl = isSupport ? '' : (isSupportView || chat.client_id === m_myUser.id ? (chat.psychologist_avatar || '') : (chat.client_avatar || ''));
+        var avatarUrl = '';
 
         var item = document.createElement('div');
         item.className = 'chat-item' + (chat.id === m_currentChatId ? ' active' : '');
@@ -203,7 +209,7 @@ function m_renderChatsList() {
 }
 
 function m_renderChatWindow() {
-    var windowEl = document.getElementById('chatWindow') || document.getElementById('chatWindowSupport') || document.getElementById('chatWindowAdmin');
+    var windowEl = document.getElementById('chatWindow') || document.getElementById('chatWindowSupport') || document.getElementById('chatWindowAdmin') || document.getElementById('chatWindowSupportPsy');
     if (!windowEl) return;
     if (!m_currentChatId) {
         windowEl.innerHTML = '<div class="chat-empty"><div class="chat-empty-icon">💬</div><p>Выберите чат слева, чтобы начать общение</p></div>';
@@ -213,20 +219,18 @@ function m_renderChatWindow() {
     if (!chat) { m_currentChatId = null; return m_renderChatWindow(); }
 
     var isSupportView = (m_myUser.role === 'support' || m_myUser.role === 'compliance');
-    var isSupport = (chat.partner_id === SUPPORT_ID);
+    var isSupport = (chat.recipient_role === 'support_client' || chat.recipient_role === 'support_psy');
     var name = '';
 
     if (isSupportView) {
-        name = chat.client_display_name || 'Клиент';
+        name = chat.sender_id === m_myUser.id ? 'Клиент' : 'Психолог';
     } else if (isSupport) {
-        name = 'Поддержка Eupsy';
-    } else if (chat.client_id === m_myUser.id) {
-        name = chat.psychologist_display_name || 'Психолог';
+        name = (chat.recipient_role === 'support_psy') ? 'Поддержка Психологов' : 'Поддержка Клиентов';
     } else {
-        name = chat.client_display_name || 'Клиент';
+        name = chat.sender_id === m_myUser.id ? 'Психолог' : 'Клиент';
     }
 
-    var roleLabel = isSupport ? 'Служба заботы' : (isSupportView ? 'Клиент' : (chat.client_id === m_myUser.id ? 'Психолог' : 'Клиент'));
+    var roleLabel = isSupport ? 'Служба заботы' : (isSupportView ? 'Клиент' : (chat.sender_id === m_myUser.id ? 'Психолог' : 'Клиент'));
     var initials = isSupport ? '🛟' : m_getInitials(name);
     var isEmpty = m_currentMessages.length === 0;
     var messagesHtml = '';
@@ -293,19 +297,10 @@ async function m_sendMessage() {
     input.value = '';
     input.disabled = true;
 
-    var chat = m_cachedChats.find(function(c) { return c.id === m_currentChatId; });
-    var isSupportChat = chat && (chat.partner_id === SUPPORT_ID);
-    var isSupportView = (m_myUser.role === 'support' || m_myUser.role === 'compliance');
-
-    var authorId = m_myUser.id;
-    if (isSupportView && isSupportChat) {
-        authorId = SUPPORT_ID;
-    }
-
     try {
         await supa.from('messages').insert({ 
             chat_id: m_currentChatId, 
-            author_id: authorId, 
+            author_id: m_myUser.id, 
             author_role: m_myUser.role, 
             text: text 
         });
@@ -395,7 +390,7 @@ export async function renderMessenger(viewMode) {
     var chatId = params.get('chat');
 
     if (psyId && !m_currentChatId) {
-        var exist = m_cachedChats.find(function(c) { return c.partner_id === psyId || c.id === psyId; });
+        var exist = m_cachedChats.find(function(c) { return c.recipient_id === psyId || c.id === psyId; });
         if (exist) { m_currentChatId = exist.id; }
         var url = new URL(window.location.href);
         url.searchParams.delete('psyId');
